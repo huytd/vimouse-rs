@@ -1,0 +1,53 @@
+vimouse-rs
+==========
+
+vimouse is an utility that allow you to control your mouse with keyboard.
+
+This application is designed to be used right after execution, that mean, you
+should not run this as a background process. Instead, use a launcher to start
+it on demand (dmenu, rofi on Linux or spotlight, alfred, raycast on macOS).
+
+How to install?
+---------------
+
+Clone this repository to your local machine, and build with:
+
+  $ cargo build --release
+
+Then move the /target/bin/release/vimouse binary file to somewhere that you
+can find later, for example /usr/local/bin
+
+
+How to use?
+-----------
+
+Movements:
+
+  y  k  u
+   ↖ ↑ ↗
+ h ← . → l
+   ↙ ↓ ↘
+  b  j  n
+
+Quick jump to a specific section on the screen:
+
+ ┌─────┬─────┬─────┐
+ │  Q  │  W  │  E  │
+ ├─────┼─────┼─────┤
+ │  A  │  S  │  D  │
+ ├─────┼─────┼─────┤
+ │  Z  │  X  │  C  │
+ └─────┴─────┴─────┘
+
+Mouse clicks:
+
+- Space: Left click
+- Ctrl: Right click
+
+Changing mouse speed:
+
+- Holding Shift: slower speed
+- Holding Alt/Opt: faster speed
+
+Use ESC to exit vimouse.
+
