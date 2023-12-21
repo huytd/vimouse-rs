@@ -14,7 +14,7 @@ Clone this repository to your local machine, and build with:
 
   $ cargo build --release
 
-Then move the /target/bin/release/vimouse binary file to somewhere that you
+Then move the /target/release/vimouse binary file to somewhere that you
 can find later, for example /usr/local/bin
 
 
@@ -51,3 +51,8 @@ Changing mouse speed:
 
 Use ESC to exit vimouse.
 
+For Raycast users
+-----------------
+
+If you use Raycast, you can create a new custom script and copy the content
+of the scripts/vimouse.sh file. So you can trigger vimouse from Raycast menu.
