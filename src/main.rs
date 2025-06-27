@@ -6,6 +6,9 @@ const SLOW_SPEED: f64 = 5.0;
 const FAST_SPEED: f64 = 40.0;
 const ULTRA_FAST_SPEED: f64 = 150.0;
 
+// Trackpad-style scroll constants - smaller values for smoother scrolling
+const TRACKPAD_SCROLL_MULTIPLIER: f64 = 0.5;
+
 static mut MOUSE_POSITION: (f64, f64) = (0., 0.);
 static mut MOUSE_SPEED: f64 = FAST_SPEED;
 static mut G_KEY_HELD: bool = false;
@@ -64,6 +67,27 @@ fn send(event_type: &EventType) {
     thread::sleep(delay);
 }
 
+// Send trackpad-style continuous scroll events with smaller delta values
+fn send_trackpad_scroll(delta_x: f64, delta_y: f64) {
+    // Convert to smaller, trackpad-style deltas
+    let trackpad_delta_x = (delta_x * TRACKPAD_SCROLL_MULTIPLIER) as i64;
+    let trackpad_delta_y = (delta_y * TRACKPAD_SCROLL_MULTIPLIER) as i64;
+    
+    // Send multiple smaller scroll events to simulate continuous scrolling
+    let num_events = 3; // Number of smaller events to send
+    let small_delta_x = trackpad_delta_x / num_events;
+    let small_delta_y = trackpad_delta_y / num_events;
+    
+    for _ in 0..num_events {
+        send(&EventType::Wheel { 
+            delta_x: small_delta_x, 
+            delta_y: small_delta_y 
+        });
+        // Small delay between events to simulate continuous scrolling
+        thread::sleep(time::Duration::from_millis(2));
+    }
+}
+
 fn callback(event: Event) -> Option<Event> {
     unsafe {
         return match event.event_type {
@@ -87,23 +111,23 @@ fn callback(event: Event) -> Option<Event> {
                             // Scroll mode: only handle h, l, j, k for scrolling
                             match key {
                                 Key::KeyH => {
-                                    // Scroll left
-                                    send(&EventType::Wheel { delta_x: -MOUSE_SPEED as i64, delta_y: 0 });
+                                    // Scroll left with trackpad-style events
+                                    send_trackpad_scroll(-MOUSE_SPEED, 0.0);
                                     return None;
                                 },
                                 Key::KeyL => {
-                                    // Scroll right
-                                    send(&EventType::Wheel { delta_x: MOUSE_SPEED as i64, delta_y: 0 });
+                                    // Scroll right with trackpad-style events
+                                    send_trackpad_scroll(MOUSE_SPEED, 0.0);
                                     return None;
                                 },
                                 Key::KeyJ => {
-                                    // Scroll down
-                                    send(&EventType::Wheel { delta_x: 0, delta_y: -MOUSE_SPEED as i64 });
+                                    // Scroll down with trackpad-style events
+                                    send_trackpad_scroll(0.0, -MOUSE_SPEED);
                                     return None;
                                 },
                                 Key::KeyK => {
-                                    // Scroll up
-                                    send(&EventType::Wheel { delta_x: 0, delta_y: MOUSE_SPEED as i64 });
+                                    // Scroll up with trackpad-style events
+                                    send_trackpad_scroll(0.0, MOUSE_SPEED);
                                     return None;
                                 },
                                 _ => {
