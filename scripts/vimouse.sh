@@ -12,7 +12,6 @@
 # @raycast.description Mouse control using keyboard
 # @raycast.author Huy Tran
 
-echo "entered vimouse mode"
-vimouse
-echo "done"
+vimouse &
+echo "mouse control using keyboard"
 
