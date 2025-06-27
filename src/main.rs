@@ -1,4 +1,3 @@
-
 use std::{time, thread, collections::HashMap};
 use lazy_static::lazy_static;
 use rdev::{Event, EventType, simulate, Key, display_size, grab, Button};
@@ -9,6 +8,7 @@ const ULTRA_FAST_SPEED: f64 = 150.0;
 
 static mut MOUSE_POSITION: (f64, f64) = (0., 0.);
 static mut MOUSE_SPEED: f64 = FAST_SPEED;
+static mut G_KEY_HELD: bool = false;
 
 static mut SCREEN_WIDTH: f64 = 0.;
 static mut SCREEN_HEIGHT: f64 = 0.;
@@ -83,9 +83,40 @@ fn callback(event: Event) -> Option<Event> {
                      *
                      */
                     Key::KeyH | Key::KeyL | Key::KeyK | Key::KeyJ | Key::KeyY | Key::KeyU | Key::KeyB | Key::KeyN => {
-                        if let Some(direction) = MOVEMENT_MAP.get(&key) {
-                            send(&EventType::MouseMove { x: MOUSE_POSITION.0 + direction.0 * MOUSE_SPEED, y: MOUSE_POSITION.1 + direction.1 * MOUSE_SPEED });
-                            return None;
+                        if G_KEY_HELD {
+                            // Scroll mode: only handle h, l, j, k for scrolling
+                            match key {
+                                Key::KeyH => {
+                                    // Scroll left
+                                    send(&EventType::Wheel { delta_x: -MOUSE_SPEED as i64, delta_y: 0 });
+                                    return None;
+                                },
+                                Key::KeyL => {
+                                    // Scroll right
+                                    send(&EventType::Wheel { delta_x: MOUSE_SPEED as i64, delta_y: 0 });
+                                    return None;
+                                },
+                                Key::KeyJ => {
+                                    // Scroll down
+                                    send(&EventType::Wheel { delta_x: 0, delta_y: -MOUSE_SPEED as i64 });
+                                    return None;
+                                },
+                                Key::KeyK => {
+                                    // Scroll up
+                                    send(&EventType::Wheel { delta_x: 0, delta_y: MOUSE_SPEED as i64 });
+                                    return None;
+                                },
+                                _ => {
+                                    // Other movement keys are ignored in scroll mode
+                                    return None;
+                                }
+                            }
+                        } else {
+                            // Normal movement mode
+                            if let Some(direction) = MOVEMENT_MAP.get(&key) {
+                                send(&EventType::MouseMove { x: MOUSE_POSITION.0 + direction.0 * MOUSE_SPEED, y: MOUSE_POSITION.1 + direction.1 * MOUSE_SPEED });
+                                return None;
+                            }
                         }
                         return Some(event);
                     }
@@ -137,6 +168,10 @@ fn callback(event: Event) -> Option<Event> {
                     Key::Alt => {
                         MOUSE_SPEED = ULTRA_FAST_SPEED;
                         return Some(event);
+                    },
+                    Key::KeyG => {
+                        G_KEY_HELD = true;
+                        return Some(event);
                     }
                     _ => Some(event)
                 }
@@ -154,6 +189,10 @@ fn callback(event: Event) -> Option<Event> {
                     Key::ShiftLeft | Key::ShiftRight | Key::Alt => {
                         MOUSE_SPEED = FAST_SPEED;
                         return Some(event);
+                    },
+                    Key::KeyG => {
+                        G_KEY_HELD = false;
+                        return None;
                     },
                     _ => Some(event)
                 }

@@ -44,6 +44,13 @@ Mouse clicks:
 - Space: Left click
 - Ctrl: Right click
 
+Scrolling:
+
+- Hold G + j: Scroll down
+- Hold G + k: Scroll up
+- Hold G + h: Scroll left
+- Hold G + l: Scroll right
+
 Changing mouse speed:
 
 - Holding Shift: slower speed
