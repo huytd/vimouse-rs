@@ -76,24 +76,24 @@ fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
     thread::spawn(move || {
         let mut velocity_x = direction_x * SCROLL_INITIAL_VELOCITY;
         let mut velocity_y = direction_y * SCROLL_INITIAL_VELOCITY;
-        
+
         // Continue scrolling until velocity drops below minimum
         while velocity_x.abs() > SCROLL_MIN_VELOCITY || velocity_y.abs() > SCROLL_MIN_VELOCITY {
             // Send scroll event with current velocity
             let delta_x = velocity_x as i64;
             let delta_y = velocity_y as i64;
-            
+
             if delta_x != 0 || delta_y != 0 {
-                let _ = simulate(&EventType::Wheel { 
-                    delta_x, 
-                    delta_y 
+                let _ = simulate(&EventType::Wheel {
+                    delta_x,
+                    delta_y
                 });
             }
-            
+
             // Apply deceleration
             velocity_x *= SCROLL_DECELERATION;
             velocity_y *= SCROLL_DECELERATION;
-            
+
             // Stop if velocity is too small
             if velocity_x.abs() < SCROLL_MIN_VELOCITY {
                 velocity_x = 0.0;
@@ -101,7 +101,7 @@ fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
             if velocity_y.abs() < SCROLL_MIN_VELOCITY {
                 velocity_y = 0.0;
             }
-            
+
             // Wait for next frame
             thread::sleep(time::Duration::from_millis(SCROLL_FRAME_DELAY_MS));
         }
@@ -215,7 +215,11 @@ fn callback(event: Event) -> Option<Event> {
                     },
                     Key::KeyG => {
                         G_KEY_HELD = true;
-                        return Some(event);
+                        return None;
+                    }
+                    Key::KeyT => {
+                        G_KEY_HELD = !G_KEY_HELD;
+                        return None;
                     }
                     _ => Some(event)
                 }

@@ -31,13 +31,13 @@ Movements:
 
 Quick jump to a specific section on the screen:
 
- ┌─────┬─────┬─────┐
- │  Q  │  W  │  E  │
- ├─────┼─────┼─────┤
- │  A  │  S  │  D  │
- ├─────┼─────┼─────┤
- │  Z  │  X  │  C  │
- └─────┴─────┴─────┘
+ ┌─────┬─────┬─────┬────┐
+ │  Q  │  W  │  E  │ R  │
+ ├─────┼─────┼─────┼────┤
+ │  A  │  S  │  D  │ F  │
+ ├─────┼─────┼─────┼────┤
+ │  Z  │  X  │  C  │ V  │
+ └─────┴─────┴─────┴────┘
 
 Mouse clicks:
 
@@ -50,6 +50,8 @@ Scrolling:
 - Hold G + k: Scroll up
 - Hold G + h: Scroll left
 - Hold G + l: Scroll right
+
+Or press T to toggle scrolling mode, so you don't have to hold G at all.
 
 Changing mouse speed:
 
