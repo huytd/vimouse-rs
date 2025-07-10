@@ -109,6 +109,42 @@ fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
     });
 }
 
+#[cfg(target_os = "macos")]
+fn move_cursor_to_focused() {
+    use std::process::Command;
+
+    let script = r#"
+        tell application \"System Events\"
+            tell (process 1 where frontmost is true)
+                set uiElem to value of attribute \"AXFocusedUIElement\"
+                if uiElem is not missing value then
+                    set p to position of uiElem
+                    set s to size of uiElem
+                    set x to (item 1 of p) + (item 1 of s) / 2
+                    set y to (item 2 of p) + (item 2 of s) / 2
+                    return (x as string) & "," & (y as string)
+                end if
+            end tell
+        end tell
+    "#;
+
+    if let Ok(output) = Command::new("osascript").arg("-e").arg(script).output() {
+        if output.status.success() {
+            if let Ok(result) = String::from_utf8(output.stdout) {
+                let coords: Vec<&str> = result.trim().split(',').collect();
+                if coords.len() == 2 {
+                    if let (Ok(x), Ok(y)) = (coords[0].parse::<f64>(), coords[1].parse::<f64>()) {
+                        send(&EventType::MouseMove { x, y });
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn move_cursor_to_focused() {}
+
 fn callback(event: Event) -> Option<Event> {
     unsafe {
         return match event.event_type {
@@ -187,6 +223,13 @@ fn callback(event: Event) -> Option<Event> {
                         send(&EventType::ButtonPress(Button::Right));
                         return None;
                     }
+                    Key::Tab => {
+                        send(&EventType::KeyPress(Key::Tab));
+                        send(&EventType::KeyRelease(Key::Tab));
+                        thread::sleep(Duration::from_millis(10));
+                        move_cursor_to_focused();
+                        return None;
+                    }
                     /* Quick jump to a specific
                      * area on the screen:
                      *  ┌─────┬─────┬─────┬─────┐
@@ -259,6 +302,9 @@ fn callback(event: Event) -> Option<Event> {
                     Key::ShiftLeft | Key::ShiftRight | Key::Alt => {
                         MOUSE_SPEED = FAST_SPEED;
                         return Some(event);
+                    }
+                    Key::Tab => {
+                        return None;
                     }
                     Key::KeyG => {
                         G_KEY_HELD = false;
