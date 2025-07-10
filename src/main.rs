@@ -2,7 +2,9 @@ use std::{cell::OnceCell, collections::HashMap, thread, time};
 use lazy_static::lazy_static;
 use rdev::{Event, EventType, simulate, Key, display_size, grab, Button};
 use gpui::{
-    div, px, rgb, size, App, AppContext, Application, Background, Bounds, Context, FontWeight, IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions
+    div, px, rgb, size, App, AppContext, Application, Background, Bounds, Context,
+    FontWeight, IntoElement, ParentElement, Pixels, Point, Render, SharedString,
+    Styled, TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions,
 };
 use core_graphics::event::CGEvent;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
@@ -23,6 +25,9 @@ static mut G_KEY_HELD: bool = false;
 
 static mut SCREEN_WIDTH: f64 = 0.;
 static mut SCREEN_HEIGHT: f64 = 0.;
+
+static APP_CONTEXT: OnceCell<gpui::AsyncApp> = OnceCell::new();
+static UI_ENTITY: OnceCell<gpui::WeakEntity<ApplicationUI>> = OnceCell::new();
 
 lazy_static! {
     static ref MOVEMENT_MAP: HashMap<Key, (f64, f64)> = HashMap::from([
@@ -108,6 +113,14 @@ fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
             thread::sleep(time::Duration::from_millis(SCROLL_FRAME_DELAY_MS));
         }
     });
+}
+
+fn trigger_ui_update() {
+    if let (Some(app), Some(ui)) = (APP_CONTEXT.get().cloned(), UI_ENTITY.get().cloned()) {
+        let _ = app.update(|app| {
+            let _ = ui.update(app, |_, cx| cx.notify());
+        });
+    }
 }
 
 fn callback(event: Event) -> Option<Event> {
@@ -217,10 +230,12 @@ fn callback(event: Event) -> Option<Event> {
                     },
                     Key::KeyG => {
                         G_KEY_HELD = true;
+                        trigger_ui_update();
                         return None;
                     }
                     Key::KeyT => {
                         G_KEY_HELD = !G_KEY_HELD;
+                        trigger_ui_update();
                         return None;
                     }
                     _ => Some(event)
@@ -242,6 +257,7 @@ fn callback(event: Event) -> Option<Event> {
                     },
                     Key::KeyG => {
                         G_KEY_HELD = false;
+                        trigger_ui_update();
                         return None;
                     },
                     _ => Some(event)
@@ -301,7 +317,7 @@ fn main() {
             Point::new(Pixels(SCREEN_WIDTH as f32 - 90.0), Pixels(SCREEN_HEIGHT as f32 - 50.0)),
             size(px(80.), px(32.0))
         );
-        cx.open_window(
+        let window = cx.open_window(
             WindowOptions {
                 kind: gpui::WindowKind::PopUp,
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -318,6 +334,10 @@ fn main() {
             },
         )
             .unwrap();
+        APP_CONTEXT.set(cx.to_async()).ok();
+        if let Ok(entity) = window.entity(cx) {
+            UI_ENTITY.set(entity.downgrade()).ok();
+        }
         cx.activate(true);
 
         if let Err(error) = grab(callback) {
