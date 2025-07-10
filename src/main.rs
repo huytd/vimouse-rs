@@ -4,6 +4,8 @@ use rdev::{Event, EventType, simulate, Key, display_size, grab, Button};
 use gpui::{
     div, px, rgb, size, App, AppContext, Application, Background, Bounds, Context, FontWeight, IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions
 };
+use core_graphics::event::CGEvent;
+use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 const SLOW_SPEED: f64 = 5.0;
 const FAST_SPEED: f64 = 40.0;
@@ -48,6 +50,14 @@ lazy_static! {
        (Key::KeyC, (2., 2.)),
        (Key::KeyV, (3., 2.)),
     ]);
+}
+
+fn get_current_mouse_position() -> Option<(f64, f64)> {
+    // Get the current mouse position using Core Graphics
+    let event_source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
+    let event = CGEvent::new(event_source).ok()?;
+    let location = event.location();
+    Some((location.x, location.y))
 }
 
 fn send(event_type: &EventType) {
@@ -276,7 +286,14 @@ fn main() {
         unsafe {
             SCREEN_WIDTH = w as f64;
             SCREEN_HEIGHT = h as f64;
-            MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
+
+            // Get current mouse position instead of defaulting to center
+            if let Some(current_pos) = get_current_mouse_position() {
+                MOUSE_POSITION = current_pos;
+            } else {
+                // Fallback to center if we can't get current position
+                MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
+            }
         }
     }
 
