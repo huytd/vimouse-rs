@@ -53,6 +53,11 @@ Scrolling:
 
 Or press T to toggle scrolling mode, so you don't have to hold G at all.
 
+Grab mode:
+
+- Press Tab to toggle grab mode.
+- When active, use h/j/k/l to move the frontmost window.
+
 Changing mouse speed:
 
 - Holding Shift: slower speed

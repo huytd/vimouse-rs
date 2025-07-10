@@ -1,9 +1,9 @@
 use core_graphics::event::CGEvent;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use gpui::{
-    div, px, rgb, size, App, AppContext, Application, Bounds, Context, FontWeight,
-    IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, Timer,
-    TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions,
+    div, px, rgb, size, App, AppContext, Application, Bounds, Context, FontWeight, IntoElement,
+    ParentElement, Pixels, Point, Render, SharedString, Styled, Timer, TitlebarOptions, Window,
+    WindowBounds, WindowDecorations, WindowOptions,
 };
 use lazy_static::lazy_static;
 use rdev::{display_size, grab, simulate, Button, Event, EventType, Key};
@@ -23,6 +23,7 @@ const SCROLL_FRAME_DELAY_MS: u64 = 16; // ~60 FPS for smooth animation
 static mut MOUSE_POSITION: (f64, f64) = (0., 0.);
 static mut MOUSE_SPEED: f64 = FAST_SPEED;
 static mut G_KEY_HELD: bool = false;
+static mut GRAB_MODE: bool = false;
 
 static mut SCREEN_WIDTH: f64 = 0.;
 static mut SCREEN_HEIGHT: f64 = 0.;
@@ -73,6 +74,20 @@ fn send(event_type: &EventType) {
     // Let ths OS catchup (at least MacOS)
     thread::sleep(delay);
 }
+
+#[cfg(target_os = "macos")]
+fn move_front_window(delta_x: f64, delta_y: f64) {
+    use std::process::Command;
+    let script = format!(
+        "tell application \"System Events\" to tell (first application process whose frontmost is true) to set position of front window to {{(item 1 of (position of front window)) + {dx}, (item 2 of (position of front window)) + {dy}}}",
+        dx = delta_x as i64,
+        dy = delta_y as i64
+    );
+    let _ = Command::new("osascript").arg("-e").arg(script).output();
+}
+
+#[cfg(not(target_os = "macos"))]
+fn move_front_window(_delta_x: f64, _delta_y: f64) {}
 
 // Send smooth scroll with momentum and easing
 fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
@@ -135,7 +150,16 @@ fn callback(event: Event) -> Option<Event> {
                     | Key::KeyU
                     | Key::KeyB
                     | Key::KeyN => {
-                        if G_KEY_HELD {
+                        if GRAB_MODE {
+                            match key {
+                                Key::KeyH => move_front_window(-MOUSE_SPEED, 0.0),
+                                Key::KeyL => move_front_window(MOUSE_SPEED, 0.0),
+                                Key::KeyJ => move_front_window(0.0, MOUSE_SPEED),
+                                Key::KeyK => move_front_window(0.0, -MOUSE_SPEED),
+                                _ => {}
+                            }
+                            return None;
+                        } else if G_KEY_HELD {
                             // Scroll mode: only handle h, l, j, k for scrolling
                             match key {
                                 Key::KeyH => {
@@ -185,6 +209,10 @@ fn callback(event: Event) -> Option<Event> {
                     }
                     Key::ControlLeft | Key::ControlRight | Key::CapsLock => {
                         send(&EventType::ButtonPress(Button::Right));
+                        return None;
+                    }
+                    Key::Tab => {
+                        GRAB_MODE = !GRAB_MODE;
                         return None;
                     }
                     /* Quick jump to a specific
@@ -264,6 +292,9 @@ fn callback(event: Event) -> Option<Event> {
                         G_KEY_HELD = false;
                         return None;
                     }
+                    Key::Tab => {
+                        return None;
+                    }
                     _ => Some(event),
                 }
             }
@@ -287,7 +318,7 @@ impl ApplicationUI {
             let _ = cx.update(|_, cx| {
                 if let Some(entity) = handle.upgrade() {
                     entity.update(cx, |app: &mut ApplicationUI, cx| unsafe {
-                        app.is_mouse_mode = !G_KEY_HELD;
+                        app.is_mouse_mode = !G_KEY_HELD && !GRAB_MODE;
                         cx.notify();
                     });
                 }
@@ -303,7 +334,9 @@ impl ApplicationUI {
 
 impl Render for ApplicationUI {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let status_text = if self.is_mouse_mode {
+        let status_text = if unsafe { GRAB_MODE } {
+            "Grab"
+        } else if self.is_mouse_mode {
             "Mouse"
         } else {
             "Scroll"
@@ -319,7 +352,9 @@ impl Render for ApplicationUI {
             .items_center()
             .size_full()
             .text_color(rgb(0xffffff))
-            .bg(rgb(if self.is_mouse_mode {
+            .bg(rgb(if unsafe { GRAB_MODE } {
+                0xc47610
+            } else if self.is_mouse_mode {
                 0x10c476
             } else {
                 0x7544c9
