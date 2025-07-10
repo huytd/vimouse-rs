@@ -264,8 +264,6 @@ impl Render for ApplicationUI {
             }
         };
 
-        println!("Status {status_text}");
-
         div()
             .text_sm()
             .font_weight(FontWeight::MEDIUM)
