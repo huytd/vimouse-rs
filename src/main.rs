@@ -1,6 +1,9 @@
-use std::{time, thread, collections::HashMap};
+use std::{cell::OnceCell, collections::HashMap, thread, time};
 use lazy_static::lazy_static;
 use rdev::{Event, EventType, simulate, Key, display_size, grab, Button};
+use gpui::{
+    div, px, rgb, size, App, AppContext, Application, Background, Bounds, Context, FontWeight, IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions
+};
 
 const SLOW_SPEED: f64 = 5.0;
 const FAST_SPEED: f64 = 40.0;
@@ -45,20 +48,6 @@ lazy_static! {
        (Key::KeyC, (2., 2.)),
        (Key::KeyV, (3., 2.)),
     ]);
-}
-
-fn main() {
-    if let Ok((w, h)) = display_size() {
-        unsafe {
-            SCREEN_WIDTH = w as f64;
-            SCREEN_HEIGHT = h as f64;
-            MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
-        }
-    }
-
-    if let Err(error) = grab(callback) {
-        println!("ERROR: {error:?}");
-    }
 }
 
 fn send(event_type: &EventType) {
@@ -253,3 +242,71 @@ fn callback(event: Event) -> Option<Event> {
     }
 }
 
+struct ApplicationUI;
+
+impl Render for ApplicationUI {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let status_text = unsafe {
+            if G_KEY_HELD {
+                "Scroll"
+            } else {
+                "Mouse"
+            }
+        };
+
+        println!("Status {status_text}");
+
+        div()
+            .text_sm()
+            .font_weight(FontWeight::MEDIUM)
+            .text_align(gpui::TextAlign::Center)
+            .flex()
+            .flex_col()
+            .justify_center()
+            .items_center()
+            .size_full()
+            .text_color(rgb(0x03361c))
+            .bg(rgb(0x03fc7f))
+            .child(format!("{status_text}"))
+    }
+}
+
+fn main() {
+    if let Ok((w, h)) = display_size() {
+        unsafe {
+            SCREEN_WIDTH = w as f64;
+            SCREEN_HEIGHT = h as f64;
+            MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
+        }
+    }
+
+    Application::new().run(|cx: &mut App| unsafe {
+        let bounds = Bounds::from_corner_and_size(
+            gpui::Corner::TopLeft,
+            Point::new(Pixels(SCREEN_WIDTH as f32 - 90.0), Pixels(SCREEN_HEIGHT as f32 - 50.0)),
+            size(px(80.), px(32.0))
+        );
+        cx.open_window(
+            WindowOptions {
+                kind: gpui::WindowKind::PopUp,
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_decorations: Some(WindowDecorations::Client),
+                titlebar: Some(TitlebarOptions {
+                    appears_transparent: true,
+                    title: Some(SharedString::from("Vimouse")),
+                    traffic_light_position: Some(gpui::Point { x: Pixels(-100.0), y: Pixels(-100.0) })
+                }),
+                ..Default::default()
+            },
+            |_, cx| {
+                cx.new(|_| ApplicationUI {})
+            },
+        )
+            .unwrap();
+        cx.activate(true);
+
+        if let Err(error) = grab(callback) {
+            println!("ERROR: {error:?}");
+        }
+    });
+}
