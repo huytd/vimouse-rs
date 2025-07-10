@@ -35,12 +35,15 @@ lazy_static! {
        (Key::KeyQ, (0., 0.)),
        (Key::KeyW, (1., 0.)),
        (Key::KeyE, (2., 0.)),
+       (Key::KeyR, (3., 0.)),
        (Key::KeyA, (0., 1.)),
        (Key::KeyS, (1., 1.)),
        (Key::KeyD, (2., 1.)),
+       (Key::KeyF, (3., 1.)),
        (Key::KeyZ, (0., 2.)),
        (Key::KeyX, (1., 2.)),
        (Key::KeyC, (2., 2.)),
+       (Key::KeyV, (3., 2.)),
     ]);
 }
 
@@ -178,18 +181,18 @@ fn callback(event: Event) -> Option<Event> {
                     },
                     /* Quick jump to a specific
                      * area on the screen:
-                     *  ┌─────┬─────┬─────┐
-                     *  │  Q  │  W  │  E  │
-                     *  ├─────┼─────┼─────┤
-                     *  │  A  │  S  │  D  │
-                     *  ├─────┼─────┼─────┤
-                     *  │  Z  │  X  │  C  │
-                     *  └─────┴─────┴─────┘
+                     *  ┌─────┬─────┬─────┬─────┐
+                     *  │  Q  │  W  │  E  │  R  │
+                     *  ├─────┼─────┼─────┼─────┤
+                     *  │  A  │  S  │  D  │  F  │
+                     *  ├─────┼─────┼─────┼─────┤
+                     *  │  Z  │  X  │  C  │  V  │
+                     *  └─────┴─────┴─────┴─────┘
                      */
-                    Key::KeyQ | Key::KeyW | Key::KeyE | Key::KeyA | Key::KeyS | Key::KeyD | Key::KeyZ | Key::KeyX | Key::KeyC => {
+                    Key::KeyQ | Key::KeyW | Key::KeyE | Key::KeyR | Key::KeyA | Key::KeyS | Key::KeyD | Key::KeyF | Key::KeyZ | Key::KeyX | Key::KeyC | Key::KeyV => {
                         if let Some((col, row)) = SCREEN_CELL_MAP.get(&key) {
                             let (x, y) = (
-                                col * SCREEN_WIDTH / 3. + SCREEN_WIDTH / 6.,
+                                col * SCREEN_WIDTH / 4. + SCREEN_WIDTH / 8.,
                                 row * SCREEN_HEIGHT / 3. + SCREEN_HEIGHT / 6.
                             );
                             send(&EventType::MouseMove { x, y });
