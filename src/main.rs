@@ -6,8 +6,11 @@ const SLOW_SPEED: f64 = 5.0;
 const FAST_SPEED: f64 = 40.0;
 const ULTRA_FAST_SPEED: f64 = 150.0;
 
-// Trackpad-style scroll constants - smaller values for smoother scrolling
-const TRACKPAD_SCROLL_MULTIPLIER: f64 = 0.5;
+// Smooth scroll constants
+const SCROLL_INITIAL_VELOCITY: f64 = 20.0;
+const SCROLL_DECELERATION: f64 = 0.85;  // Momentum decay factor
+const SCROLL_MIN_VELOCITY: f64 = 0.5;   // Minimum velocity before stopping
+const SCROLL_FRAME_DELAY_MS: u64 = 16;  // ~60 FPS for smooth animation
 
 static mut MOUSE_POSITION: (f64, f64) = (0., 0.);
 static mut MOUSE_SPEED: f64 = FAST_SPEED;
@@ -67,25 +70,42 @@ fn send(event_type: &EventType) {
     thread::sleep(delay);
 }
 
-// Send trackpad-style continuous scroll events with smaller delta values
-fn send_trackpad_scroll(delta_x: f64, delta_y: f64) {
-    // Convert to smaller, trackpad-style deltas
-    let trackpad_delta_x = (delta_x * TRACKPAD_SCROLL_MULTIPLIER) as i64;
-    let trackpad_delta_y = (delta_y * TRACKPAD_SCROLL_MULTIPLIER) as i64;
-    
-    // Send multiple smaller scroll events to simulate continuous scrolling
-    let num_events = 3; // Number of smaller events to send
-    let small_delta_x = trackpad_delta_x / num_events;
-    let small_delta_y = trackpad_delta_y / num_events;
-    
-    for _ in 0..num_events {
-        send(&EventType::Wheel { 
-            delta_x: small_delta_x, 
-            delta_y: small_delta_y 
-        });
-        // Small delay between events to simulate continuous scrolling
-        thread::sleep(time::Duration::from_millis(2));
-    }
+// Send smooth scroll with momentum and easing
+fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
+    // Spawn a thread to handle the smooth scroll animation
+    thread::spawn(move || {
+        let mut velocity_x = direction_x * SCROLL_INITIAL_VELOCITY;
+        let mut velocity_y = direction_y * SCROLL_INITIAL_VELOCITY;
+        
+        // Continue scrolling until velocity drops below minimum
+        while velocity_x.abs() > SCROLL_MIN_VELOCITY || velocity_y.abs() > SCROLL_MIN_VELOCITY {
+            // Send scroll event with current velocity
+            let delta_x = velocity_x as i64;
+            let delta_y = velocity_y as i64;
+            
+            if delta_x != 0 || delta_y != 0 {
+                let _ = simulate(&EventType::Wheel { 
+                    delta_x, 
+                    delta_y 
+                });
+            }
+            
+            // Apply deceleration
+            velocity_x *= SCROLL_DECELERATION;
+            velocity_y *= SCROLL_DECELERATION;
+            
+            // Stop if velocity is too small
+            if velocity_x.abs() < SCROLL_MIN_VELOCITY {
+                velocity_x = 0.0;
+            }
+            if velocity_y.abs() < SCROLL_MIN_VELOCITY {
+                velocity_y = 0.0;
+            }
+            
+            // Wait for next frame
+            thread::sleep(time::Duration::from_millis(SCROLL_FRAME_DELAY_MS));
+        }
+    });
 }
 
 fn callback(event: Event) -> Option<Event> {
@@ -111,23 +131,23 @@ fn callback(event: Event) -> Option<Event> {
                             // Scroll mode: only handle h, l, j, k for scrolling
                             match key {
                                 Key::KeyH => {
-                                    // Scroll left with trackpad-style events
-                                    send_trackpad_scroll(-MOUSE_SPEED, 0.0);
+                                    // Scroll left with smooth momentum
+                                    send_smooth_scroll(-1.0, 0.0);
                                     return None;
                                 },
                                 Key::KeyL => {
-                                    // Scroll right with trackpad-style events
-                                    send_trackpad_scroll(MOUSE_SPEED, 0.0);
+                                    // Scroll right with smooth momentum
+                                    send_smooth_scroll(1.0, 0.0);
                                     return None;
                                 },
                                 Key::KeyJ => {
-                                    // Scroll down with trackpad-style events
-                                    send_trackpad_scroll(0.0, -MOUSE_SPEED);
+                                    // Scroll down with smooth momentum
+                                    send_smooth_scroll(0.0, -1.0);
                                     return None;
                                 },
                                 Key::KeyK => {
-                                    // Scroll up with trackpad-style events
-                                    send_trackpad_scroll(0.0, MOUSE_SPEED);
+                                    // Scroll up with smooth momentum
+                                    send_smooth_scroll(0.0, 1.0);
                                     return None;
                                 },
                                 _ => {
