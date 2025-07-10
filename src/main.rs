@@ -1,11 +1,14 @@
-use std::{cell::OnceCell, collections::HashMap, thread, time};
-use lazy_static::lazy_static;
-use rdev::{Event, EventType, simulate, Key, display_size, grab, Button};
-use gpui::{
-    div, px, rgb, size, App, AppContext, Application, Background, Bounds, Context, FontWeight, IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions
-};
 use core_graphics::event::CGEvent;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+use gpui::{
+    div, px, rgb, size, App, AppContext, Application, Bounds, Context, FontWeight,
+    IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, Timer,
+    TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions,
+};
+use lazy_static::lazy_static;
+use rdev::{display_size, grab, simulate, Button, Event, EventType, Key};
+use std::time::Duration;
+use std::{collections::HashMap, thread, time};
 
 const SLOW_SPEED: f64 = 5.0;
 const FAST_SPEED: f64 = 40.0;
@@ -13,9 +16,9 @@ const ULTRA_FAST_SPEED: f64 = 150.0;
 
 // Smooth scroll constants
 const SCROLL_INITIAL_VELOCITY: f64 = 20.0;
-const SCROLL_DECELERATION: f64 = 0.85;  // Momentum decay factor
-const SCROLL_MIN_VELOCITY: f64 = 0.5;   // Minimum velocity before stopping
-const SCROLL_FRAME_DELAY_MS: u64 = 16;  // ~60 FPS for smooth animation
+const SCROLL_DECELERATION: f64 = 0.85; // Momentum decay factor
+const SCROLL_MIN_VELOCITY: f64 = 0.5; // Minimum velocity before stopping
+const SCROLL_FRAME_DELAY_MS: u64 = 16; // ~60 FPS for smooth animation
 
 static mut MOUSE_POSITION: (f64, f64) = (0., 0.);
 static mut MOUSE_SPEED: f64 = FAST_SPEED;
@@ -26,29 +29,28 @@ static mut SCREEN_HEIGHT: f64 = 0.;
 
 lazy_static! {
     static ref MOVEMENT_MAP: HashMap<Key, (f64, f64)> = HashMap::from([
-        (Key::KeyH, (-1.,  0.)),
-        (Key::KeyL, ( 1.,  0.)),
-        (Key::KeyJ, ( 0.,  1.)),
-        (Key::KeyK, ( 0., -1.)),
+        (Key::KeyH, (-1., 0.)),
+        (Key::KeyL, (1., 0.)),
+        (Key::KeyJ, (0., 1.)),
+        (Key::KeyK, (0., -1.)),
         (Key::KeyY, (-1., -1.)),
-        (Key::KeyU, ( 1., -1.)),
-        (Key::KeyB, (-1.,  1.)),
-        (Key::KeyN, ( 1.,  1.)),
+        (Key::KeyU, (1., -1.)),
+        (Key::KeyB, (-1., 1.)),
+        (Key::KeyN, (1., 1.)),
     ]);
-
     static ref SCREEN_CELL_MAP: HashMap<Key, (f64, f64)> = HashMap::from([
-       (Key::KeyQ, (0., 0.)),
-       (Key::KeyW, (1., 0.)),
-       (Key::KeyE, (2., 0.)),
-       (Key::KeyR, (3., 0.)),
-       (Key::KeyA, (0., 1.)),
-       (Key::KeyS, (1., 1.)),
-       (Key::KeyD, (2., 1.)),
-       (Key::KeyF, (3., 1.)),
-       (Key::KeyZ, (0., 2.)),
-       (Key::KeyX, (1., 2.)),
-       (Key::KeyC, (2., 2.)),
-       (Key::KeyV, (3., 2.)),
+        (Key::KeyQ, (0., 0.)),
+        (Key::KeyW, (1., 0.)),
+        (Key::KeyE, (2., 0.)),
+        (Key::KeyR, (3., 0.)),
+        (Key::KeyA, (0., 1.)),
+        (Key::KeyS, (1., 1.)),
+        (Key::KeyD, (2., 1.)),
+        (Key::KeyF, (3., 1.)),
+        (Key::KeyZ, (0., 2.)),
+        (Key::KeyX, (1., 2.)),
+        (Key::KeyC, (2., 2.)),
+        (Key::KeyV, (3., 2.)),
     ]);
 }
 
@@ -86,10 +88,7 @@ fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
             let delta_y = velocity_y as i64;
 
             if delta_x != 0 || delta_y != 0 {
-                let _ = simulate(&EventType::Wheel {
-                    delta_x,
-                    delta_y
-                });
+                let _ = simulate(&EventType::Wheel { delta_x, delta_y });
             }
 
             // Apply deceleration
@@ -116,7 +115,7 @@ fn callback(event: Event) -> Option<Event> {
             EventType::MouseMove { x, y } => {
                 MOUSE_POSITION = (x, y);
                 return Some(event);
-            },
+            }
             EventType::KeyPress(key) => {
                 return match key {
                     /* Movement directions:
@@ -128,7 +127,14 @@ fn callback(event: Event) -> Option<Event> {
                      *  b  j  n
                      *
                      */
-                    Key::KeyH | Key::KeyL | Key::KeyK | Key::KeyJ | Key::KeyY | Key::KeyU | Key::KeyB | Key::KeyN => {
+                    Key::KeyH
+                    | Key::KeyL
+                    | Key::KeyK
+                    | Key::KeyJ
+                    | Key::KeyY
+                    | Key::KeyU
+                    | Key::KeyB
+                    | Key::KeyN => {
                         if G_KEY_HELD {
                             // Scroll mode: only handle h, l, j, k for scrolling
                             match key {
@@ -136,22 +142,22 @@ fn callback(event: Event) -> Option<Event> {
                                     // Scroll left with smooth momentum
                                     send_smooth_scroll(-1.0, 0.0);
                                     return None;
-                                },
+                                }
                                 Key::KeyL => {
                                     // Scroll right with smooth momentum
                                     send_smooth_scroll(1.0, 0.0);
                                     return None;
-                                },
+                                }
                                 Key::KeyJ => {
                                     // Scroll down with smooth momentum
                                     send_smooth_scroll(0.0, -1.0);
                                     return None;
-                                },
+                                }
                                 Key::KeyK => {
                                     // Scroll up with smooth momentum
                                     send_smooth_scroll(0.0, 1.0);
                                     return None;
-                                },
+                                }
                                 _ => {
                                     // Other movement keys are ignored in scroll mode
                                     return None;
@@ -160,7 +166,10 @@ fn callback(event: Event) -> Option<Event> {
                         } else {
                             // Normal movement mode
                             if let Some(direction) = MOVEMENT_MAP.get(&key) {
-                                send(&EventType::MouseMove { x: MOUSE_POSITION.0 + direction.0 * MOUSE_SPEED, y: MOUSE_POSITION.1 + direction.1 * MOUSE_SPEED });
+                                send(&EventType::MouseMove {
+                                    x: MOUSE_POSITION.0 + direction.0 * MOUSE_SPEED,
+                                    y: MOUSE_POSITION.1 + direction.1 * MOUSE_SPEED,
+                                });
                                 return None;
                             }
                         }
@@ -173,11 +182,11 @@ fn callback(event: Event) -> Option<Event> {
                     Key::Space => {
                         send(&EventType::ButtonPress(Button::Left));
                         return None;
-                    },
+                    }
                     Key::ControlLeft | Key::ControlRight | Key::CapsLock => {
                         send(&EventType::ButtonPress(Button::Right));
                         return None;
-                    },
+                    }
                     /* Quick jump to a specific
                      * area on the screen:
                      *  ┌─────┬─────┬─────┬─────┐
@@ -188,17 +197,28 @@ fn callback(event: Event) -> Option<Event> {
                      *  │  Z  │  X  │  C  │  V  │
                      *  └─────┴─────┴─────┴─────┘
                      */
-                    Key::KeyQ | Key::KeyW | Key::KeyE | Key::KeyR | Key::KeyA | Key::KeyS | Key::KeyD | Key::KeyF | Key::KeyZ | Key::KeyX | Key::KeyC | Key::KeyV => {
+                    Key::KeyQ
+                    | Key::KeyW
+                    | Key::KeyE
+                    | Key::KeyR
+                    | Key::KeyA
+                    | Key::KeyS
+                    | Key::KeyD
+                    | Key::KeyF
+                    | Key::KeyZ
+                    | Key::KeyX
+                    | Key::KeyC
+                    | Key::KeyV => {
                         if let Some((col, row)) = SCREEN_CELL_MAP.get(&key) {
                             let (x, y) = (
                                 col * SCREEN_WIDTH / 4. + SCREEN_WIDTH / 8.,
-                                row * SCREEN_HEIGHT / 3. + SCREEN_HEIGHT / 6.
+                                row * SCREEN_HEIGHT / 3. + SCREEN_HEIGHT / 6.,
                             );
                             send(&EventType::MouseMove { x, y });
                             return None;
                         }
                         return Some(event);
-                    },
+                    }
                     /* Others:
                      * - Esc: Exit
                      * - Shift: Slow speed
@@ -206,15 +226,15 @@ fn callback(event: Event) -> Option<Event> {
                      */
                     Key::Escape => {
                         std::process::exit(0);
-                    },
+                    }
                     Key::ShiftLeft | Key::ShiftRight => {
                         MOUSE_SPEED = SLOW_SPEED;
                         return Some(event);
-                    },
+                    }
                     Key::Alt => {
                         MOUSE_SPEED = ULTRA_FAST_SPEED;
                         return Some(event);
-                    },
+                    }
                     Key::KeyG => {
                         G_KEY_HELD = true;
                         return None;
@@ -223,45 +243,70 @@ fn callback(event: Event) -> Option<Event> {
                         G_KEY_HELD = !G_KEY_HELD;
                         return None;
                     }
-                    _ => Some(event)
-                }
-            },
+                    _ => Some(event),
+                };
+            }
             EventType::KeyRelease(key) => {
                 return match key {
                     Key::Space => {
                         send(&EventType::ButtonRelease(Button::Left));
                         return None;
-                    },
+                    }
                     Key::ControlLeft | Key::ControlRight | Key::CapsLock => {
                         send(&EventType::ButtonRelease(Button::Right));
                         return None;
-                    },
+                    }
                     Key::ShiftLeft | Key::ShiftRight | Key::Alt => {
                         MOUSE_SPEED = FAST_SPEED;
                         return Some(event);
-                    },
+                    }
                     Key::KeyG => {
                         G_KEY_HELD = false;
                         return None;
-                    },
-                    _ => Some(event)
+                    }
+                    _ => Some(event),
                 }
             }
-            _ => Some(event)
+            _ => Some(event),
         };
     }
 }
 
-struct ApplicationUI;
+struct ApplicationUI {
+    is_mouse_mode: bool,
+    _ticker: gpui::Task<()>,
+}
+
+impl ApplicationUI {
+    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let handle = cx.entity().downgrade();
+
+        let task = cx.spawn_in(window, async move |_, cx| loop {
+            Timer::after(Duration::from_millis(250)).await;
+
+            let _ = cx.update(|_, cx| {
+                if let Some(entity) = handle.upgrade() {
+                    entity.update(cx, |app: &mut ApplicationUI, cx| unsafe {
+                        app.is_mouse_mode = !G_KEY_HELD;
+                        cx.notify();
+                    });
+                }
+            });
+        });
+
+        Self {
+            is_mouse_mode: true,
+            _ticker: task, // store it so it keeps running
+        }
+    }
+}
 
 impl Render for ApplicationUI {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let status_text = unsafe {
-            if G_KEY_HELD {
-                "Scroll"
-            } else {
-                "Mouse"
-            }
+        let status_text = if self.is_mouse_mode {
+            "Mouse"
+        } else {
+            "Scroll"
         };
 
         div()
@@ -273,9 +318,13 @@ impl Render for ApplicationUI {
             .justify_center()
             .items_center()
             .size_full()
-            .text_color(rgb(0x03361c))
-            .bg(rgb(0x03fc7f))
-            .child(format!("{status_text}"))
+            .text_color(rgb(0xffffff))
+            .bg(rgb(if self.is_mouse_mode {
+                0x10c476
+            } else {
+                0x7544c9
+            }))
+            .child(div().shadow_sm().child(format!("{status_text}")))
     }
 }
 
@@ -298,8 +347,11 @@ fn main() {
     Application::new().run(|cx: &mut App| unsafe {
         let bounds = Bounds::from_corner_and_size(
             gpui::Corner::TopLeft,
-            Point::new(Pixels(SCREEN_WIDTH as f32 - 90.0), Pixels(SCREEN_HEIGHT as f32 - 50.0)),
-            size(px(80.), px(32.0))
+            Point::new(
+                Pixels(SCREEN_WIDTH as f32 - 90.0),
+                Pixels(SCREEN_HEIGHT as f32 - 50.0),
+            ),
+            size(px(80.), px(32.0)),
         );
         cx.open_window(
             WindowOptions {
@@ -309,15 +361,16 @@ fn main() {
                 titlebar: Some(TitlebarOptions {
                     appears_transparent: true,
                     title: Some(SharedString::from("Vimouse")),
-                    traffic_light_position: Some(gpui::Point { x: Pixels(-100.0), y: Pixels(-100.0) })
+                    traffic_light_position: Some(gpui::Point {
+                        x: Pixels(-100.0),
+                        y: Pixels(-100.0),
+                    }),
                 }),
                 ..Default::default()
             },
-            |_, cx| {
-                cx.new(|_| ApplicationUI {})
-            },
+            |win, cx| cx.new(|cx| ApplicationUI::new(win, cx)),
         )
-            .unwrap();
+        .unwrap();
         cx.activate(true);
 
         if let Err(error) = grab(callback) {
