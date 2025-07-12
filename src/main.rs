@@ -109,6 +109,59 @@ fn send_smooth_scroll(direction_x: f64, direction_y: f64) {
     });
 }
 
+#[cfg(target_os = "macos")]
+fn move_cursor_to_focused() {
+    use accessibility::{AXAttribute, AXUIElement};
+    use accessibility_sys::{
+        kAXFocusedUIElementAttribute, kAXPositionAttribute, kAXSizeAttribute,
+        kAXValueTypeCGPoint, kAXValueTypeCGSize, AXValueGetType, AXValueGetValue,
+        AXValueRef,
+    };
+    use core_foundation::base::CFType;
+    use core_foundation::string::CFString;
+    use core_graphics::geometry::{CGPoint, CGSize};
+
+    let system = AXUIElement::system_wide();
+    let focused_attr = AXAttribute::<AXUIElement>::new(&CFString::from_static_string(
+        kAXFocusedUIElementAttribute,
+    ));
+
+    if let Ok(focused) = system.attribute(&focused_attr) {
+        let pos_attr = AXAttribute::<CFType>::new(&CFString::from_static_string(kAXPositionAttribute));
+        let size_attr = AXAttribute::<CFType>::new(&CFString::from_static_string(kAXSizeAttribute));
+
+        if let (Ok(pos_val), Ok(size_val)) = (focused.attribute(&pos_attr), focused.attribute(&size_attr)) {
+            unsafe {
+                let pos_ref = pos_val.as_CFTypeRef() as AXValueRef;
+                let size_ref = size_val.as_CFTypeRef() as AXValueRef;
+
+                if AXValueGetType(pos_ref) == kAXValueTypeCGPoint
+                    && AXValueGetType(size_ref) == kAXValueTypeCGSize
+                {
+                    let mut point = CGPoint::new(0.0, 0.0);
+                    let mut sz = CGSize::new(0.0, 0.0);
+                    if AXValueGetValue(
+                        pos_ref,
+                        kAXValueTypeCGPoint,
+                        &mut point as *mut _ as *mut _,
+                    ) && AXValueGetValue(
+                        size_ref,
+                        kAXValueTypeCGSize,
+                        &mut sz as *mut _ as *mut _,
+                    ) {
+                        let x = point.x + sz.width / 2.0;
+                        let y = point.y + sz.height / 2.0;
+                        send(&EventType::MouseMove { x: x as f64, y: y as f64 });
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn move_cursor_to_focused() {}
+
 fn callback(event: Event) -> Option<Event> {
     unsafe {
         return match event.event_type {
@@ -187,6 +240,13 @@ fn callback(event: Event) -> Option<Event> {
                         send(&EventType::ButtonPress(Button::Right));
                         return None;
                     }
+                    Key::Tab => {
+                        send(&EventType::KeyPress(Key::Tab));
+                        send(&EventType::KeyRelease(Key::Tab));
+                        thread::sleep(Duration::from_millis(10));
+                        move_cursor_to_focused();
+                        return None;
+                    }
                     /* Quick jump to a specific
                      * area on the screen:
                      *  ┌─────┬─────┬─────┬─────┐
@@ -259,6 +319,9 @@ fn callback(event: Event) -> Option<Event> {
                     Key::ShiftLeft | Key::ShiftRight | Key::Alt => {
                         MOUSE_SPEED = FAST_SPEED;
                         return Some(event);
+                    }
+                    Key::Tab => {
+                        return None;
                     }
                     Key::KeyG => {
                         G_KEY_HELD = false;
