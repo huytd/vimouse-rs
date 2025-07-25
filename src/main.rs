@@ -134,7 +134,7 @@ mod clickable_detector {
             let mut apps_ref: CFTypeRef = ptr::null();
             let result = AXUIElementCopyAttributeValue(
                 system_wide,
-                apps_attr.as_concrete_TypeRef(),
+                apps_attr.as_concrete_TypeRef() as CFTypeRef,
                 &mut apps_ref,
             );
             
@@ -145,7 +145,7 @@ mod clickable_detector {
             }
             
             // Parse applications array using Core Foundation
-            if let Ok(apps_array) = CFArray::<AXUIElementRef>::try_from(apps_ref) {
+            if let Ok(apps_array) = CFArrayHelper::create_from_ref(apps_ref) {
                 // Iterate through each application
                 for i in 0..apps_array.len() {
                     if let Some(app_element) = apps_array.get(i) {
@@ -174,7 +174,7 @@ mod clickable_detector {
         let mut windows_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             app_element,
-            windows_attr.as_concrete_TypeRef(),
+            windows_attr.as_concrete_TypeRef() as CFTypeRef,
             &mut windows_ref,
         );
         
@@ -182,7 +182,7 @@ mod clickable_detector {
             return;
         }
         
-        if let Ok(windows_array) = CFArray::<AXUIElementRef>::try_from(windows_ref) {
+        if let Ok(windows_array) = CFArrayHelper::create_from_ref(windows_ref) {
             // Iterate through each window
             for i in 0..windows_array.len() {
                 if let Some(window_element) = windows_array.get(i) {
@@ -210,12 +210,12 @@ mod clickable_detector {
         let mut children_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            children_attr.as_concrete_TypeRef(),
+            children_attr.as_concrete_TypeRef() as CFTypeRef,
             &mut children_ref,
         );
         
         if result == kAXErrorSuccess && !children_ref.is_null() {
-            if let Ok(children_array) = CFArray::<AXUIElementRef>::try_from(children_ref) {
+            if let Ok(children_array) = CFArrayHelper::create_from_ref(children_ref) {
                 for i in 0..children_array.len() {
                     if let Some(child_element) = children_array.get(i) {
                         collect_window_elements(*child_element, elements, depth + 1);
@@ -292,17 +292,14 @@ mod clickable_detector {
         let mut enabled_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            enabled_attr.as_concrete_TypeRef(),
+            enabled_attr.as_concrete_TypeRef() as CFTypeRef,
             &mut enabled_ref,
         );
         
         if result == kAXErrorSuccess && !enabled_ref.is_null() {
             // Try to interpret as CFNumber
-            if let Some(enabled_cf) = CFNumber::wrap_under_get_rule(enabled_ref as *const _) {
-                enabled_cf.to_i32().unwrap_or(0) != 0
-            } else {
-                true // Default to enabled if we can't determine
-            }
+            let enabled_cf = CFNumber::wrap_under_get_rule(enabled_ref as *const _);
+            enabled_cf.to_i32().unwrap_or(0) != 0
         } else {
             true // Default to enabled
         }
@@ -318,7 +315,7 @@ mod clickable_detector {
         let mut position_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            position_attr.as_concrete_TypeRef(),
+            position_attr.as_concrete_TypeRef() as CFTypeRef,
             &mut position_ref,
         );
         
@@ -347,7 +344,7 @@ mod clickable_detector {
         let mut size_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            size_attr.as_concrete_TypeRef(),
+            size_attr.as_concrete_TypeRef() as CFTypeRef,
             &mut size_ref,
         );
         
@@ -375,16 +372,13 @@ mod clickable_detector {
         let mut attr_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element, 
-            attribute.as_concrete_TypeRef(), 
+            attribute.as_concrete_TypeRef() as CFTypeRef, 
             &mut attr_ref
         );
         
         if result == kAXErrorSuccess && !attr_ref.is_null() {
-            if let Some(cf_string) = CFString::wrap_under_create_rule(attr_ref as *const _) {
-                Some(cf_string.to_string())
-            } else {
-                None
-            }
+            let cf_string = CFString::wrap_under_create_rule(attr_ref as *const _);
+            Some(cf_string.to_string())
         } else {
             None
         }
@@ -403,19 +397,15 @@ mod clickable_detector {
         height: f64,
     }
 
-    // Helper trait to convert CFTypeRef to CFArray
-    trait CFArrayFromRef<T> {
-        fn try_from(cf_ref: CFTypeRef) -> Result<CFArray<T>, &'static str>;
-    }
+    // Helper struct to avoid trait conflicts
+    struct CFArrayHelper;
 
-    impl CFArrayFromRef<AXUIElementRef> for CFArray<AXUIElementRef> {
-        fn try_from(cf_ref: CFTypeRef) -> Result<CFArray<AXUIElementRef>, &'static str> {
+    impl CFArrayHelper {
+        unsafe fn create_from_ref(cf_ref: CFTypeRef) -> Result<CFArray<AXUIElementRef>, &'static str> {
             if cf_ref.is_null() {
                 return Err("Null CFTypeRef");
             }
-            unsafe {
-                Ok(CFArray::wrap_under_create_rule(cf_ref as *const _))
-            }
+            Ok(CFArray::wrap_under_create_rule(cf_ref as *const _))
         }
     }
 }
