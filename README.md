@@ -15,10 +15,10 @@ A Rust application that provides vim-like mouse control with keyboard shortcuts,
 
 Press the **'i' key** while the application is running to scan the screen and print all clickable elements to the console. This feature:
 
-- Enumerates all windows on the screen using X11
+- Enumerates all windows on the screen using macOS Core Graphics APIs
 - Excludes the vimouse application window itself
 - Displays window names, application names, locations, and sizes
-- Works on Linux with X11 window manager
+- Works on macOS with native window management APIs
 
 ### Example Output
 
@@ -27,7 +27,7 @@ Press the **'i' key** while the application is running to scan the screen and pr
 Found 5 clickable elements:
 --------------------------------------------------------------------------------
 1. Window
-   Text: "Firefox: GitHub - Example Repository"
+   Text: "Safari: GitHub - Example Repository"
    Location: (100, 50)
    Size: 1200x800
 
@@ -37,7 +37,7 @@ Found 5 clickable elements:
    Size: 800x400
 
 3. Window
-   Text: "VSCode: main.rs"
+   Text: "Visual Studio Code: main.rs"
    Location: (1300, 100)
    Size: 1000x900
 
@@ -72,11 +72,11 @@ Total: 5 clickable elements
 
 ## Installation
 
-### Prerequisites (Linux)
+### Prerequisites (macOS)
 
+Make sure you have Rust installed:
 ```bash
-sudo apt-get update
-sudo apt-get install -y libx11-dev libxi-dev libxtst-dev libevdev-dev pkg-config autotools-dev autoconf libtool
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ### Build
@@ -91,21 +91,28 @@ cargo build --release
 ./target/release/vimouse
 ```
 
-**Note**: You may need to run with appropriate permissions or add the application to your system's accessibility/input monitoring settings.
+**Note**: On macOS, you'll need to grant accessibility permissions to the application. When you first run it, macOS will prompt you to add it to System Preferences > Security & Privacy > Privacy > Accessibility.
 
 ## Platform Support
 
-- **Linux**: Full support with X11 window manager
-- **macOS**: Original mouse control features (clickable elements detection not yet implemented)
-- **Windows**: Original mouse control features (clickable elements detection not yet implemented)
+- **macOS**: Full support with Core Graphics and GPUI
+- **Linux/Windows**: Original mouse control features (clickable elements detection not implemented)
 
 ## Technical Details
 
 The clickable elements detection feature uses:
-- X11 libraries for window enumeration
-- Recursive window tree traversal
-- Window property extraction (name, class, position, size)
-- Safe memory management with proper cleanup
+- Core Graphics `CGWindowListCopyWindowInfo` for window enumeration
+- Core Foundation data types for safe memory management
+- Window property extraction (name, owner, bounds)
+- Filtering to exclude system and self windows
+
+## Permissions
+
+On macOS, this application requires:
+- **Accessibility Access**: For mouse control and input monitoring
+- **Input Monitoring**: For global key capture
+
+The system will prompt you to grant these permissions when you first run the application.
 
 ## License
 

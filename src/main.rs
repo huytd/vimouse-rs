@@ -1,17 +1,14 @@
+use core_graphics::event::CGEvent;
+use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+use gpui::{
+    div, px, rgb, size, App, AppContext, Application, Bounds, Context, FontWeight,
+    IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, Timer,
+    TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions,
+};
 use lazy_static::lazy_static;
 use rdev::{display_size, grab, simulate, Button, Event, EventType, Key};
+use std::time::Duration;
 use std::{collections::HashMap, thread, time};
-
-#[cfg(target_os = "linux")]
-use x11::xlib::{
-    Display, Window, XCloseDisplay, XDefaultRootWindow, XOpenDisplay, XQueryTree,
-    XFree, XGetWMName, XTextProperty, 
-    XGetWindowAttributes, XWindowAttributes, XGetClassHint, XClassHint
-};
-#[cfg(target_os = "linux")]
-use std::ffi::CStr;
-#[cfg(target_os = "linux")]
-use std::ptr;
 
 const SLOW_SPEED: f64 = 5.0;
 const FAST_SPEED: f64 = 40.0;
@@ -40,136 +37,142 @@ pub struct ClickableElement {
     pub role: String,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_os = "macos")]
 mod clickable_detector {
     use super::*;
-    use x11::xlib::*;
-    use std::ffi::CStr;
+    use core_foundation::{
+        array::{CFArray, CFArrayRef},
+        base::{CFTypeRef, TCFType},
+        dictionary::{CFDictionary, CFDictionaryRef},
+        number::{CFNumber, CFNumberRef},
+        string::{CFString, CFStringRef},
+    };
+    use core_graphics::window::{
+        kCGWindowListOptionOnScreenOnly, kCGWindowListExcludeDesktopElements,
+        CGWindowListCopyWindowInfo, kCGNullWindowID
+    };
     use std::ptr;
 
     pub fn find_clickable_elements() -> Vec<ClickableElement> {
         let mut elements = Vec::new();
         
         unsafe {
-            let display = XOpenDisplay(ptr::null());
-            if display.is_null() {
-                println!("Failed to open X11 display");
+            // Get all on-screen windows using Core Graphics
+            let window_list_info = CGWindowListCopyWindowInfo(
+                kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
+                kCGNullWindowID
+            );
+            
+            if window_list_info.is_null() {
                 return elements;
             }
             
-            let root = XDefaultRootWindow(display);
-            collect_windows_recursive(display, root, &mut elements, 0);
+            let window_array = CFArray::wrap_under_create_rule(window_list_info);
             
-            XCloseDisplay(display);
+            for i in 0..window_array.len() {
+                if let Some(window_info_ref) = window_array.get(i) {
+                    if let Some(window_dict) = CFDictionary::from_void(window_info_ref as *const _) {
+                        if let Some(element) = create_clickable_element_from_window(&window_dict) {
+                            // Skip our own application window
+                            if let Some(owner_name) = get_window_owner_name(&window_dict) {
+                                if owner_name.to_lowercase().contains("vimouse") {
+                                    continue;
+                                }
+                            }
+                            elements.push(element);
+                        }
+                    }
+                }
+            }
         }
         
         elements
     }
 
-    unsafe fn collect_windows_recursive(
-        display: *mut Display,
-        window: Window,
-        elements: &mut Vec<ClickableElement>,
-        depth: i32
-    ) {
-        if depth > 10 { // Prevent infinite recursion
-            return;
-        }
-
-        // Get window attributes
-        let mut attrs: XWindowAttributes = std::mem::zeroed();
-        if XGetWindowAttributes(display, window, &mut attrs) == 0 {
-            return;
-        }
-
-        // Skip invisible windows
-        if attrs.width <= 0 || attrs.height <= 0 || attrs.class == 2 { // InputOnly
-            return;
-        }
-
-        // Get window name
-        let window_name = get_window_name(display, window);
-        let class_name = get_window_class(display, window);
+    fn create_clickable_element_from_window(window_dict: &CFDictionary) -> Option<ClickableElement> {
+        // Get window bounds
+        let bounds = get_window_bounds(window_dict)?;
         
-        // Create clickable element if window has useful properties
-        if !window_name.is_empty() || !class_name.is_empty() {
-            let display_text = if !window_name.is_empty() {
-                if !class_name.is_empty() {
-                    format!("{}: {}", class_name, window_name)
-                } else {
-                    window_name
-                }
-            } else {
-                class_name
-            };
-
-            if !display_text.is_empty() && display_text != "vimouse" {
-                elements.push(ClickableElement {
-                    text: display_text,
-                    x: attrs.x as f64,
-                    y: attrs.y as f64,
-                    width: attrs.width as f64,
-                    height: attrs.height as f64,
-                    role: "Window".to_string(),
-                });
-            }
-        }
-
-        // Get child windows
-        let mut root_return: Window = 0;
-        let mut parent_return: Window = 0;
-        let mut children: *mut Window = ptr::null_mut();
-        let mut nchildren: u32 = 0;
-
-        if XQueryTree(display, window, &mut root_return, &mut parent_return, 
-                     &mut children, &mut nchildren) != 0 {
-            if !children.is_null() && nchildren > 0 {
-                let children_slice = std::slice::from_raw_parts(children, nchildren as usize);
-                for &child in children_slice {
-                    collect_windows_recursive(display, child, elements, depth + 1);
-                }
-                XFree(children as *mut _);
-            }
-        }
+        // Get window name/title
+        let window_name = get_window_name(window_dict);
+        let owner_name = get_window_owner_name(window_dict).unwrap_or("Unknown".to_string());
+        
+        // Create a display text combining owner and window name
+        let display_text = if window_name.is_empty() {
+            format!("{} Window", owner_name)
+        } else {
+            format!("{}: {}", owner_name, window_name)
+        };
+        
+        Some(ClickableElement {
+            text: display_text,
+            x: bounds.0,
+            y: bounds.1,
+            width: bounds.2,
+            height: bounds.3,
+            role: "Window".to_string(),
+        })
     }
 
-    unsafe fn get_window_name(display: *mut Display, window: Window) -> String {
-        let mut text_prop: XTextProperty = std::mem::zeroed();
-        if XGetWMName(display, window, &mut text_prop) != 0 && !text_prop.value.is_null() {
-            let name = CStr::from_ptr(text_prop.value as *const i8);
-            let result = name.to_string_lossy().to_string();
-            XFree(text_prop.value as *mut _);
-            result
-        } else {
-            String::new()
+    fn get_window_bounds(window_dict: &CFDictionary) -> Option<(f64, f64, f64, f64)> {
+        // Get kCGWindowBounds
+        let bounds_key = CFString::new("kCGWindowBounds");
+        if let Some(bounds_ref) = window_dict.find(&bounds_key) {
+            if let Some(bounds_dict) = CFDictionary::from_void(bounds_ref as *const _) {
+                let x_key = CFString::new("X");
+                let y_key = CFString::new("Y");
+                let width_key = CFString::new("Width");
+                let height_key = CFString::new("Height");
+                
+                let x = get_number_from_dict(&bounds_dict, &x_key).unwrap_or(0.0);
+                let y = get_number_from_dict(&bounds_dict, &y_key).unwrap_or(0.0);
+                let width = get_number_from_dict(&bounds_dict, &width_key).unwrap_or(0.0);
+                let height = get_number_from_dict(&bounds_dict, &height_key).unwrap_or(0.0);
+                
+                return Some((x, y, width, height));
+            }
         }
+        None
     }
 
-    unsafe fn get_window_class(display: *mut Display, window: Window) -> String {
-        let mut class_hint: XClassHint = std::mem::zeroed();
-        if XGetClassHint(display, window, &mut class_hint) != 0 {
-            let mut result = String::new();
-            if !class_hint.res_class.is_null() {
-                let class_name = CStr::from_ptr(class_hint.res_class);
-                result = class_name.to_string_lossy().to_string();
-                XFree(class_hint.res_class as *mut _);
+    fn get_window_name(window_dict: &CFDictionary) -> String {
+        let name_key = CFString::new("kCGWindowName");
+        if let Some(name_ref) = window_dict.find(&name_key) {
+            if let Some(name_str) = CFString::from_void(name_ref as *const _) {
+                return name_str.to_string();
             }
-            if !class_hint.res_name.is_null() {
-                XFree(class_hint.res_name as *mut _);
-            }
-            result
-        } else {
-            String::new()
         }
+        "".to_string()
+    }
+
+    fn get_window_owner_name(window_dict: &CFDictionary) -> Option<String> {
+        let owner_key = CFString::new("kCGWindowOwnerName");
+        if let Some(owner_ref) = window_dict.find(&owner_key) {
+            if let Some(owner_str) = CFString::from_void(owner_ref as *const _) {
+                return Some(owner_str.to_string());
+            }
+        }
+        None
+    }
+
+    fn get_number_from_dict(dict: &CFDictionary, key: &CFString) -> Option<f64> {
+        if let Some(number_ref) = dict.find(key) {
+            if let Some(number) = CFNumber::from_void(number_ref as *const _) {
+                if let Some(value) = number.to_f64() {
+                    return Some(value);
+                }
+            }
+        }
+        None
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(target_os = "macos"))]
 mod clickable_detector {
     use super::*;
     
     pub fn find_clickable_elements() -> Vec<ClickableElement> {
-        println!("Clickable element detection is only supported on Linux currently");
+        println!("Clickable element detection is only supported on macOS currently");
         Vec::new()
     }
 }
@@ -225,6 +228,14 @@ lazy_static! {
         (Key::KeyC, (2., 2.)),
         (Key::KeyV, (3., 2.)),
     ]);
+}
+
+fn get_current_mouse_position() -> Option<(f64, f64)> {
+    // Get the current mouse position using Core Graphics
+    let event_source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
+    let event = CGEvent::new(event_source).ok()?;
+    let location = event.location();
+    Some((location.x, location.y))
 }
 
 fn send(event_type: &EventType) {
@@ -444,24 +455,109 @@ fn callback(event: Event) -> Option<Event> {
     }
 }
 
+struct ApplicationUI {
+    is_mouse_mode: bool,
+    _ticker: gpui::Task<()>,
+}
+
+impl ApplicationUI {
+    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let handle = cx.entity().downgrade();
+
+        let task = cx.spawn_in(window, async move |_, cx| loop {
+            Timer::after(Duration::from_millis(250)).await;
+
+            let _ = cx.update(|_, cx| {
+                if let Some(entity) = handle.upgrade() {
+                    entity.update(cx, |app: &mut ApplicationUI, cx| unsafe {
+                        app.is_mouse_mode = !G_KEY_HELD;
+                        cx.notify();
+                    });
+                }
+            });
+        });
+
+        Self {
+            is_mouse_mode: true,
+            _ticker: task, // store it so it keeps running
+        }
+    }
+}
+
+impl Render for ApplicationUI {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let status_text = if self.is_mouse_mode {
+            "Mouse"
+        } else {
+            "Scroll"
+        };
+
+        div()
+            .text_sm()
+            .font_weight(FontWeight::MEDIUM)
+            .text_align(gpui::TextAlign::Center)
+            .flex()
+            .flex_col()
+            .justify_center()
+            .items_center()
+            .size_full()
+            .text_color(rgb(0xffffff))
+            .bg(rgb(if self.is_mouse_mode {
+                0x10c476
+            } else {
+                0x7544c9
+            }))
+            .child(div().shadow_sm().child(format!("{status_text}")))
+    }
+}
+
 fn main() {
-    println!("🐭 Vimouse - Vim-like mouse control");
-    println!("Press 'i' to find clickable elements on screen");
-    println!("Press 'Esc' to exit");
-    println!("Use hjkl for movement, space for click, g+hjkl for scroll");
-    
     if let Ok((w, h)) = display_size() {
         unsafe {
             SCREEN_WIDTH = w as f64;
             SCREEN_HEIGHT = h as f64;
-            MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
+
+            // Get current mouse position instead of defaulting to center
+            if let Some(current_pos) = get_current_mouse_position() {
+                MOUSE_POSITION = current_pos;
+            } else {
+                // Fallback to center if we can't get current position
+                MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
+            }
         }
-        println!("Screen size: {}x{}", w, h);
     }
 
-    if let Err(error) = grab(callback) {
-        println!("ERROR: {error:?}");
-        println!("Note: You may need to run this program with appropriate permissions");
-        println!("or add it to your accessibility/input monitoring settings.");
-    }
+    Application::new().run(|cx: &mut App| unsafe {
+        let bounds = Bounds::from_corner_and_size(
+            gpui::Corner::TopLeft,
+            Point::new(
+                Pixels(SCREEN_WIDTH as f32 - 90.0),
+                Pixels(SCREEN_HEIGHT as f32 - 50.0),
+            ),
+            size(px(80.), px(32.0)),
+        );
+        cx.open_window(
+            WindowOptions {
+                kind: gpui::WindowKind::PopUp,
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_decorations: Some(WindowDecorations::Client),
+                titlebar: Some(TitlebarOptions {
+                    appears_transparent: true,
+                    title: Some(SharedString::from("Vimouse")),
+                    traffic_light_position: Some(gpui::Point {
+                        x: Pixels(-100.0),
+                        y: Pixels(-100.0),
+                    }),
+                }),
+                ..Default::default()
+            },
+            |win, cx| cx.new(|cx| ApplicationUI::new(win, cx)),
+        )
+        .unwrap();
+        cx.activate(true);
+
+        if let Err(error) = grab(callback) {
+            println!("ERROR: {error:?}");
+        }
+    });
 }
