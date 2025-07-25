@@ -1,13 +1,7 @@
 use core_graphics::event::CGEvent;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
-use gpui::{
-    div, px, rgb, size, App, AppContext, Application, Bounds, Context, FontWeight,
-    IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled, Timer,
-    TitlebarOptions, Window, WindowBounds, WindowDecorations, WindowOptions,
-};
 use lazy_static::lazy_static;
 use rdev::{display_size, grab, simulate, Button, Event, EventType, Key};
-use std::time::Duration;
 use std::{collections::HashMap, thread, time};
 
 const SLOW_SPEED: f64 = 5.0;
@@ -455,63 +449,12 @@ fn callback(event: Event) -> Option<Event> {
     }
 }
 
-struct ApplicationUI {
-    is_mouse_mode: bool,
-    _ticker: gpui::Task<()>,
-}
-
-impl ApplicationUI {
-    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let handle = cx.entity().downgrade();
-
-        let task = cx.spawn_in(window, async move |_, cx| loop {
-            Timer::after(Duration::from_millis(250)).await;
-
-            let _ = cx.update(|_, cx| {
-                if let Some(entity) = handle.upgrade() {
-                    entity.update(cx, |app: &mut ApplicationUI, cx| unsafe {
-                        app.is_mouse_mode = !G_KEY_HELD;
-                        cx.notify();
-                    });
-                }
-            });
-        });
-
-        Self {
-            is_mouse_mode: true,
-            _ticker: task, // store it so it keeps running
-        }
-    }
-}
-
-impl Render for ApplicationUI {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let status_text = if self.is_mouse_mode {
-            "Mouse"
-        } else {
-            "Scroll"
-        };
-
-        div()
-            .text_sm()
-            .font_weight(FontWeight::MEDIUM)
-            .text_align(gpui::TextAlign::Center)
-            .flex()
-            .flex_col()
-            .justify_center()
-            .items_center()
-            .size_full()
-            .text_color(rgb(0xffffff))
-            .bg(rgb(if self.is_mouse_mode {
-                0x10c476
-            } else {
-                0x7544c9
-            }))
-            .child(div().shadow_sm().child(format!("{status_text}")))
-    }
-}
-
 fn main() {
+    println!("🐭 Vimouse - Vim-like Mouse Control (macOS)");
+    println!("Press 'i' to find clickable elements on screen");
+    println!("Press 'Esc' to exit");
+    println!("Use hjkl for movement, space for click, g+hjkl for scroll");
+    
     if let Ok((w, h)) = display_size() {
         unsafe {
             SCREEN_WIDTH = w as f64;
@@ -525,39 +468,25 @@ fn main() {
                 MOUSE_POSITION = (SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.);
             }
         }
+        println!("Screen size: {}x{}", w, h);
     }
 
-    Application::new().run(|cx: &mut App| unsafe {
-        let bounds = Bounds::from_corner_and_size(
-            gpui::Corner::TopLeft,
-            Point::new(
-                Pixels(SCREEN_WIDTH as f32 - 90.0),
-                Pixels(SCREEN_HEIGHT as f32 - 50.0),
-            ),
-            size(px(80.), px(32.0)),
-        );
-        cx.open_window(
-            WindowOptions {
-                kind: gpui::WindowKind::PopUp,
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                window_decorations: Some(WindowDecorations::Client),
-                titlebar: Some(TitlebarOptions {
-                    appears_transparent: true,
-                    title: Some(SharedString::from("Vimouse")),
-                    traffic_light_position: Some(gpui::Point {
-                        x: Pixels(-100.0),
-                        y: Pixels(-100.0),
-                    }),
-                }),
-                ..Default::default()
-            },
-            |win, cx| cx.new(|cx| ApplicationUI::new(win, cx)),
-        )
-        .unwrap();
-        cx.activate(true);
+    println!("\n🔑 Key Bindings:");
+    println!("   Movement: h/j/k/l (left/down/up/right)");
+    println!("   Click: Space (left), Ctrl (right)");
+    println!("   Speed: Shift (slow), Alt (fast)");
+    println!("   Scroll: g+hjkl, t (toggle)");
+    println!("   Detect: i (find clickable elements)");
+    println!("   Exit: Esc");
+    println!("\n⚠️  Note: You may need to grant accessibility permissions in System Preferences.");
+    println!("Starting mouse control...\n");
 
-        if let Err(error) = grab(callback) {
-            println!("ERROR: {error:?}");
-        }
-    });
+    if let Err(error) = grab(callback) {
+        println!("ERROR: {error:?}");
+        println!("\n💡 Troubleshooting:");
+        println!("   1. Go to System Preferences > Security & Privacy > Privacy");
+        println!("   2. Select 'Accessibility' from the left panel");
+        println!("   3. Add this application to the list");
+        println!("   4. Make sure the checkbox is enabled");
+    }
 }

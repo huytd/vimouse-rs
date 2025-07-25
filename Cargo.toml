@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 lazy_static = "1.4.0"
 rdev = { version = "0.5.3", features = ["unstable_grab"] }
-gpui = { git = "https://github.com/zed-industries/zed" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"

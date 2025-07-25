@@ -91,11 +91,30 @@ cargo build --release
 ./target/release/vimouse
 ```
 
-**Note**: On macOS, you'll need to grant accessibility permissions to the application. When you first run it, macOS will prompt you to add it to System Preferences > Security & Privacy > Privacy > Accessibility.
+The application will display helpful information in the console:
+
+```
+🐭 Vimouse - Vim-like Mouse Control (macOS)
+Press 'i' to find clickable elements on screen
+Press 'Esc' to exit
+Use hjkl for movement, space for click, g+hjkl for scroll
+Screen size: 2560x1440
+
+🔑 Key Bindings:
+   Movement: h/j/k/l (left/down/up/right)
+   Click: Space (left), Ctrl (right)
+   Speed: Shift (slow), Alt (fast)
+   Scroll: g+hjkl, t (toggle)
+   Detect: i (find clickable elements)
+   Exit: Esc
+
+⚠️  Note: You may need to grant accessibility permissions in System Preferences.
+Starting mouse control...
+```
 
 ## Platform Support
 
-- **macOS**: Full support with Core Graphics and GPUI
+- **macOS**: Full support with Core Graphics APIs
 - **Linux/Windows**: Original mouse control features (clickable elements detection not implemented)
 
 ## Technical Details
@@ -105,6 +124,7 @@ The clickable elements detection feature uses:
 - Core Foundation data types for safe memory management
 - Window property extraction (name, owner, bounds)
 - Filtering to exclude system and self windows
+- Console-based interface for simplicity and reliability
 
 ## Permissions
 
@@ -113,6 +133,25 @@ On macOS, this application requires:
 - **Input Monitoring**: For global key capture
 
 The system will prompt you to grant these permissions when you first run the application.
+
+### Troubleshooting Permissions
+
+If you get a permissions error:
+
+1. Go to **System Preferences** > **Security & Privacy** > **Privacy**
+2. Select **Accessibility** from the left panel
+3. Click the lock icon and enter your password
+4. Click the **+** button and add the vimouse executable
+5. Make sure the checkbox next to vimouse is enabled
+6. Restart the application
+
+## Architecture
+
+This version uses a simple console-based architecture:
+- **No GUI dependencies**: Runs entirely in the terminal
+- **Direct Core Graphics integration**: Uses native macOS APIs
+- **Thread-based detection**: Clickable elements detection runs in background
+- **Stable Rust**: Compatible with stable Rust compiler (no unstable features)
 
 ## License
 
