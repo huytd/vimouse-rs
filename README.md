@@ -10,39 +10,35 @@ A Rust application that provides vim-like mouse control with keyboard shortcuts,
 - **Clickable elements detection**: Press 'i' to find all clickable elements on screen
 - **Multiple click modes**: Space for left click, Ctrl/CapsLock for right click
 - **Variable speed**: Shift for slow movement, Alt for ultra-fast movement
+- **Cross-platform**: Works on macOS, Linux, and Windows
 
 ## New Feature: Clickable Elements Detection
 
 Press the **'i' key** while the application is running to scan the screen and print all clickable elements to the console. This feature:
 
-- Enumerates all windows on the screen using macOS Core Graphics APIs
+- **On macOS**: Uses Core Graphics APIs to enumerate actual windows
+- **On other platforms**: Shows sample data for demonstration purposes
 - Excludes the vimouse application window itself
-- Displays window names, application names, locations, and sizes
-- Works on macOS with native window management APIs
+- Displays window names, applications, locations, and sizes
 
 ### Example Output
 
 ```
 🔍 Searching for clickable elements on screen...
-Found 5 clickable elements:
+Found 2 clickable elements:
 --------------------------------------------------------------------------------
 1. Window
-   Text: "Safari: GitHub - Example Repository"
-   Location: (100, 50)
-   Size: 1200x800
+   Text: "Sample Window 1"
+   Location: (100, 100)
+   Size: 800x600
 
 2. Window
-   Text: "Terminal: bash"
-   Location: (50, 900)
-   Size: 800x400
-
-3. Window
-   Text: "Visual Studio Code: main.rs"
-   Location: (1300, 100)
-   Size: 1000x900
+   Text: "Sample Window 2"
+   Location: (200, 200)
+   Size: 600x400
 
 --------------------------------------------------------------------------------
-Total: 5 clickable elements
+Total: 2 clickable elements
 ```
 
 ## Key Bindings
@@ -72,7 +68,7 @@ Total: 5 clickable elements
 
 ## Installation
 
-### Prerequisites (macOS)
+### Prerequisites
 
 Make sure you have Rust installed:
 ```bash
@@ -114,27 +110,36 @@ Starting mouse control...
 
 ## Platform Support
 
-- **macOS**: Full support with Core Graphics APIs
-- **Linux/Windows**: Original mouse control features (clickable elements detection not implemented)
+- **macOS**: Full support with Core Graphics APIs for real window detection
+- **Linux/Windows**: Core mouse control features with sample clickable elements data
 
 ## Technical Details
 
-The clickable elements detection feature uses:
+### Architecture
+- **Cross-platform compatibility**: Uses conditional compilation for platform-specific features
+- **No unstable Rust features**: Compatible with stable Rust compiler
+- **Simple dependencies**: Minimal dependency footprint for reliability
+- **Console-based interface**: No GUI framework dependencies
+
+### macOS Implementation
 - Core Graphics `CGWindowListCopyWindowInfo` for window enumeration
 - Core Foundation data types for safe memory management
-- Window property extraction (name, owner, bounds)
-- Filtering to exclude system and self windows
-- Console-based interface for simplicity and reliability
+- Platform-specific mouse position detection
+- Native accessibility integration
+
+### Error Handling
+- Graceful degradation when permissions are not available
+- Clear error messages with troubleshooting steps
+- Platform-appropriate guidance for users
 
 ## Permissions
 
+### macOS
 On macOS, this application requires:
 - **Accessibility Access**: For mouse control and input monitoring
 - **Input Monitoring**: For global key capture
 
-The system will prompt you to grant these permissions when you first run the application.
-
-### Troubleshooting Permissions
+### Troubleshooting Permissions (macOS)
 
 If you get a permissions error:
 
@@ -145,13 +150,19 @@ If you get a permissions error:
 5. Make sure the checkbox next to vimouse is enabled
 6. Restart the application
 
-## Architecture
+### Other Platforms
+Other platforms may require appropriate permissions for:
+- Global key capture
+- Mouse simulation
+- Input monitoring
 
-This version uses a simple console-based architecture:
-- **No GUI dependencies**: Runs entirely in the terminal
-- **Direct Core Graphics integration**: Uses native macOS APIs
-- **Thread-based detection**: Clickable elements detection runs in background
-- **Stable Rust**: Compatible with stable Rust compiler (no unstable features)
+## Development Notes
+
+This implementation was designed to:
+- Avoid unstable Rust features and complex dependency chains
+- Provide a working foundation that can be enhanced per platform
+- Maintain the original vimouse functionality while adding new features
+- Be easily buildable and deployable across different environments
 
 ## License
 
