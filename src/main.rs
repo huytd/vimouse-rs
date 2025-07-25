@@ -43,7 +43,8 @@ mod clickable_detector {
     };
     use core_foundation::{
         array::CFArray,
-        base::TCFType,
+        base::{CFTypeRef, TCFType},
+        dictionary::CFDictionary,
     };
 
     pub fn find_clickable_elements() -> Vec<ClickableElement> {
@@ -60,7 +61,7 @@ mod clickable_detector {
                 return elements;
             }
             
-            let window_array = CFArray::wrap_under_create_rule(window_list_info);
+            let window_array: CFArray<CFDictionary> = CFArray::wrap_under_create_rule(window_list_info);
             
             // For simplicity, just report the count and basic info
             for i in 0..window_array.len() {
