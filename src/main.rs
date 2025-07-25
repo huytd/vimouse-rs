@@ -1,3 +1,7 @@
+#[cfg(target_os = "macos")]
+#[link(name = "ApplicationServices", kind = "framework")]
+extern "C" {}
+
 use lazy_static::lazy_static;
 use rdev::{display_size, grab, simulate, Button, Event, EventType, Key};
 use std::{collections::HashMap, thread, time};
@@ -48,14 +52,77 @@ mod clickable_detector {
         string::CFString,
         number::CFNumber,
     };
-    use accessibility_sys::*;
+    use objc::runtime::{Object, Class};
+    use objc::{msg_send, sel, sel_impl};
     use std::ptr;
+    use libc::{c_void, c_char};
+
+    // Raw accessibility constants and types
+    type AXUIElementRef = *const c_void;
+    type AXError = i32;
+    
+    const kAXErrorSuccess: AXError = 0;
+    const kAXValueTypeCGPoint: i32 = 1;
+    const kAXValueTypeCGSize: i32 = 2;
+
+    // Raw accessibility function declarations
+    extern "C" {
+        fn AXUIElementCreateSystemWide() -> AXUIElementRef;
+        fn AXUIElementCopyAttributeValue(
+            element: AXUIElementRef,
+            attribute: CFTypeRef,
+            value: *mut CFTypeRef,
+        ) -> AXError;
+        fn AXValueGetValue(
+            value: CFTypeRef,
+            theType: i32,
+            valuePtr: *mut c_void,
+        ) -> bool;
+        fn CFRelease(cf: CFTypeRef);
+    }
+
+    // Attribute name constants
+    fn get_applications_attribute() -> CFString {
+        CFString::from_static_string("AXApplications")
+    }
+
+    fn get_windows_attribute() -> CFString {
+        CFString::from_static_string("AXWindows")
+    }
+
+    fn get_children_attribute() -> CFString {
+        CFString::from_static_string("AXChildren")
+    }
+
+    fn get_role_attribute() -> CFString {
+        CFString::from_static_string("AXRole")
+    }
+
+    fn get_title_attribute() -> CFString {
+        CFString::from_static_string("AXTitle")
+    }
+
+    fn get_value_attribute() -> CFString {
+        CFString::from_static_string("AXValue")
+    }
+
+    fn get_enabled_attribute() -> CFString {
+        CFString::from_static_string("AXEnabled")
+    }
+
+    fn get_position_attribute() -> CFString {
+        CFString::from_static_string("AXPosition")
+    }
+
+    fn get_size_attribute() -> CFString {
+        CFString::from_static_string("AXSize")
+    }
 
     pub fn find_clickable_elements() -> Vec<ClickableElement> {
         let mut elements = Vec::new();
         
         unsafe {
-            // First get the system-wide accessibility element
+            // Get the system-wide accessibility element
             let system_wide = AXUIElementCreateSystemWide();
             if system_wide.is_null() {
                 println!("Failed to create system-wide accessibility element");
@@ -63,39 +130,39 @@ mod clickable_detector {
             }
             
             // Get all applications
+            let apps_attr = get_applications_attribute();
             let mut apps_ref: CFTypeRef = ptr::null();
             let result = AXUIElementCopyAttributeValue(
-                system_wide, 
-                kAXApplicationsAttribute, 
-                &mut apps_ref
+                system_wide,
+                apps_attr.as_concrete_TypeRef(),
+                &mut apps_ref,
             );
             
             if result != kAXErrorSuccess || apps_ref.is_null() {
                 println!("Failed to get applications list. Error code: {}", result);
-                CFRelease(system_wide as CFTypeRef);
+                CFRelease(system_wide);
                 return elements;
             }
             
-            let apps_array: CFArray<AXUIElementRef> = CFArray::wrap_under_create_rule(apps_ref as _);
-            
-            // Iterate through each application
-            for i in 0..apps_array.len() {
-                if let Some(app_ref) = apps_array.get(i) {
-                    let app_element = *app_ref;
-                    
-                    // Skip our own application
-                    if let Some(app_name) = get_app_name(app_element) {
-                        if app_name.to_lowercase().contains("vimouse") {
-                            continue;
+            // Parse applications array using Core Foundation
+            if let Ok(apps_array) = CFArray::<AXUIElementRef>::try_from(apps_ref) {
+                // Iterate through each application
+                for i in 0..apps_array.len() {
+                    if let Some(app_element) = apps_array.get(i) {
+                        // Skip our own application
+                        if let Some(app_name) = get_app_name(*app_element) {
+                            if app_name.to_lowercase().contains("vimouse") {
+                                continue;
+                            }
                         }
+                        
+                        // Get windows for this application
+                        collect_app_elements(*app_element, &mut elements);
                     }
-                    
-                    // Get windows for this application
-                    collect_app_elements(app_element, &mut elements);
                 }
             }
             
-            CFRelease(system_wide as CFTypeRef);
+            CFRelease(system_wide);
         }
         
         elements
@@ -103,24 +170,24 @@ mod clickable_detector {
 
     unsafe fn collect_app_elements(app_element: AXUIElementRef, elements: &mut Vec<ClickableElement>) {
         // Get windows for this application
+        let windows_attr = get_windows_attribute();
         let mut windows_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             app_element,
-            kAXWindowsAttribute,
-            &mut windows_ref
+            windows_attr.as_concrete_TypeRef(),
+            &mut windows_ref,
         );
         
         if result != kAXErrorSuccess || windows_ref.is_null() {
             return;
         }
         
-        let windows_array: CFArray<AXUIElementRef> = CFArray::wrap_under_create_rule(windows_ref as _);
-        
-        // Iterate through each window
-        for i in 0..windows_array.len() {
-            if let Some(window_ref) = windows_array.get(i) {
-                let window_element = *window_ref;
-                collect_window_elements(window_element, elements, 0);
+        if let Ok(windows_array) = CFArray::<AXUIElementRef>::try_from(windows_ref) {
+            // Iterate through each window
+            for i in 0..windows_array.len() {
+                if let Some(window_element) = windows_array.get(i) {
+                    collect_window_elements(*window_element, elements, 0);
+                }
             }
         }
     }
@@ -139,20 +206,20 @@ mod clickable_detector {
         }
         
         // Get children and recurse
+        let children_attr = get_children_attribute();
         let mut children_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            kAXChildrenAttribute,
-            &mut children_ref
+            children_attr.as_concrete_TypeRef(),
+            &mut children_ref,
         );
         
         if result == kAXErrorSuccess && !children_ref.is_null() {
-            let children_array: CFArray<AXUIElementRef> = CFArray::wrap_under_create_rule(children_ref as _);
-            
-            for i in 0..children_array.len() {
-                if let Some(child_ref) = children_array.get(i) {
-                    let child_element = *child_ref;
-                    collect_window_elements(child_element, elements, depth + 1);
+            if let Ok(children_array) = CFArray::<AXUIElementRef>::try_from(children_ref) {
+                for i in 0..children_array.len() {
+                    if let Some(child_element) = children_array.get(i) {
+                        collect_window_elements(*child_element, elements, depth + 1);
+                    }
                 }
             }
         }
@@ -205,32 +272,33 @@ mod clickable_detector {
     }
 
     unsafe fn get_app_name(app_element: AXUIElementRef) -> Option<String> {
-        get_element_attribute_string(app_element, kAXTitleAttribute)
+        get_element_attribute_string(app_element, &get_title_attribute())
     }
 
     unsafe fn get_element_role(element: AXUIElementRef) -> Option<String> {
-        get_element_attribute_string(element, kAXRoleAttribute)
+        get_element_attribute_string(element, &get_role_attribute())
     }
 
     unsafe fn get_element_title(element: AXUIElementRef) -> Option<String> {
-        get_element_attribute_string(element, kAXTitleAttribute)
+        get_element_attribute_string(element, &get_title_attribute())
     }
 
     unsafe fn get_element_value(element: AXUIElementRef) -> Option<String> {
-        get_element_attribute_string(element, kAXValueAttribute)
+        get_element_attribute_string(element, &get_value_attribute())
     }
 
     unsafe fn is_element_enabled(element: AXUIElementRef) -> bool {
+        let enabled_attr = get_enabled_attribute();
         let mut enabled_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            kAXEnabledAttribute,
-            &mut enabled_ref
+            enabled_attr.as_concrete_TypeRef(),
+            &mut enabled_ref,
         );
         
         if result == kAXErrorSuccess && !enabled_ref.is_null() {
-            let enabled_num = enabled_ref as *const CFNumber;
-            if let Some(enabled_cf) = CFNumber::wrap_under_get_rule(enabled_num) {
+            // Try to interpret as CFNumber
+            if let Some(enabled_cf) = CFNumber::wrap_under_get_rule(enabled_ref as *const _) {
                 enabled_cf.to_i32().unwrap_or(0) != 0
             } else {
                 true // Default to enabled if we can't determine
@@ -246,19 +314,20 @@ mod clickable_detector {
     }
 
     unsafe fn get_element_position(element: AXUIElementRef) -> Option<(f64, f64)> {
+        let position_attr = get_position_attribute();
         let mut position_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            kAXPositionAttribute,
-            &mut position_ref
+            position_attr.as_concrete_TypeRef(),
+            &mut position_ref,
         );
         
         if result == kAXErrorSuccess && !position_ref.is_null() {
             let mut point = CGPoint { x: 0.0, y: 0.0 };
             let success = AXValueGetValue(
-                position_ref as AXValueRef,
-                kAXValueCGPointType,
-                &mut point as *mut _ as *mut _
+                position_ref,
+                kAXValueTypeCGPoint,
+                &mut point as *mut _ as *mut c_void,
             );
             
             CFRelease(position_ref);
@@ -274,19 +343,20 @@ mod clickable_detector {
     }
 
     unsafe fn get_element_size(element: AXUIElementRef) -> Option<(f64, f64)> {
+        let size_attr = get_size_attribute();
         let mut size_ref: CFTypeRef = ptr::null();
         let result = AXUIElementCopyAttributeValue(
             element,
-            kAXSizeAttribute,
-            &mut size_ref
+            size_attr.as_concrete_TypeRef(),
+            &mut size_ref,
         );
         
         if result == kAXErrorSuccess && !size_ref.is_null() {
             let mut size = CGSize { width: 0.0, height: 0.0 };
             let success = AXValueGetValue(
-                size_ref as AXValueRef,
-                kAXValueCGSizeType,
-                &mut size as *mut _ as *mut _
+                size_ref,
+                kAXValueTypeCGSize,
+                &mut size as *mut _ as *mut c_void,
             );
             
             CFRelease(size_ref);
@@ -301,13 +371,20 @@ mod clickable_detector {
         }
     }
 
-    unsafe fn get_element_attribute_string(element: AXUIElementRef, attribute: CFStringRef) -> Option<String> {
+    unsafe fn get_element_attribute_string(element: AXUIElementRef, attribute: &CFString) -> Option<String> {
         let mut attr_ref: CFTypeRef = ptr::null();
-        let result = AXUIElementCopyAttributeValue(element, attribute, &mut attr_ref);
+        let result = AXUIElementCopyAttributeValue(
+            element, 
+            attribute.as_concrete_TypeRef(), 
+            &mut attr_ref
+        );
         
         if result == kAXErrorSuccess && !attr_ref.is_null() {
-            let cf_string = CFString::wrap_under_create_rule(attr_ref as _);
-            Some(cf_string.to_string())
+            if let Some(cf_string) = CFString::wrap_under_create_rule(attr_ref as *const _) {
+                Some(cf_string.to_string())
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -324,6 +401,22 @@ mod clickable_detector {
     struct CGSize {
         width: f64,
         height: f64,
+    }
+
+    // Helper trait to convert CFTypeRef to CFArray
+    trait CFArrayFromRef<T> {
+        fn try_from(cf_ref: CFTypeRef) -> Result<CFArray<T>, &'static str>;
+    }
+
+    impl CFArrayFromRef<AXUIElementRef> for CFArray<AXUIElementRef> {
+        fn try_from(cf_ref: CFTypeRef) -> Result<CFArray<AXUIElementRef>, &'static str> {
+            if cf_ref.is_null() {
+                return Err("Null CFTypeRef");
+            }
+            unsafe {
+                Ok(CFArray::wrap_under_create_rule(cf_ref as *const _))
+            }
+        }
     }
 }
 
