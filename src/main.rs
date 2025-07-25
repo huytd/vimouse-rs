@@ -1,4 +1,6 @@
+#[cfg(target_os = "macos")]
 use core_graphics::event::CGEvent;
+#[cfg(target_os = "macos")]
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use gpui::{
     div, px, rgb, size, App, AppContext, Application, Bounds, Context, FontWeight,
@@ -54,12 +56,20 @@ lazy_static! {
     ]);
 }
 
+#[cfg(target_os = "macos")]
 fn get_current_mouse_position() -> Option<(f64, f64)> {
     // Get the current mouse position using Core Graphics
     let event_source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
     let event = CGEvent::new(event_source).ok()?;
     let location = event.location();
     Some((location.x, location.y))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn get_current_mouse_position() -> Option<(f64, f64)> {
+    // For non-macOS systems, return None for now
+    // This could be implemented using X11 or other platform-specific APIs
+    None
 }
 
 fn send(event_type: &EventType) {
@@ -303,28 +313,32 @@ impl ApplicationUI {
 
 impl Render for ApplicationUI {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let status_text = if self.is_mouse_mode {
-            "Mouse"
+        let border_color = if self.is_mouse_mode {
+            rgb(0xFF8C00) // Orange for mouse mode
         } else {
-            "Scroll"
+            rgb(0x00FF00) // Green for scrolling mode
         };
 
         div()
-            .text_sm()
-            .font_weight(FontWeight::MEDIUM)
-            .text_align(gpui::TextAlign::Center)
-            .flex()
-            .flex_col()
-            .justify_center()
-            .items_center()
             .size_full()
-            .text_color(rgb(0xffffff))
-            .bg(rgb(if self.is_mouse_mode {
-                0x10c476
-            } else {
-                0x7544c9
-            }))
-            .child(div().shadow_sm().child(format!("{status_text}")))
+            .bg(rgb(0x00000000)) // Transparent background
+            .border(px(3.0))
+            .border_color(border_color)
+            .child(
+                div()
+                    .absolute()
+                    .top(px(20.0))
+                    .right(px(20.0))
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_align(gpui::TextAlign::Center)
+                    .text_color(rgb(0xffffff))
+                    .bg(rgb(0x000000CC)) // Semi-transparent black background
+                    .px(px(12.0))
+                    .py(px(6.0))
+                    .rounded_md()
+                    .child(if self.is_mouse_mode { "Mouse Mode" } else { "Scroll Mode" })
+            )
     }
 }
 
@@ -347,13 +361,10 @@ fn main() {
     Application::new().run(|cx: &mut App| unsafe {
         let bounds = Bounds::from_corner_and_size(
             gpui::Corner::TopLeft,
-            Point::new(
-                Pixels(SCREEN_WIDTH as f32 - 90.0),
-                Pixels(SCREEN_HEIGHT as f32 - 50.0),
-            ),
-            size(px(80.), px(32.0)),
+            Point::new(Pixels(0.0), Pixels(0.0)),
+            size(px(SCREEN_WIDTH as f32), px(SCREEN_HEIGHT as f32)),
         );
-        cx.open_window(
+        match cx.open_window(
             WindowOptions {
                 kind: gpui::WindowKind::PopUp,
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -369,9 +380,16 @@ fn main() {
                 ..Default::default()
             },
             |win, cx| cx.new(|cx| ApplicationUI::new(win, cx)),
-        )
-        .unwrap();
-        cx.activate(true);
+        ) {
+            Ok(_) => {
+                cx.activate(true);
+                println!("Vimouse window created successfully!");
+            }
+            Err(e) => {
+                println!("Failed to create window: {:?}", e);
+                println!("Running in headless mode - mouse control only");
+            }
+        }
 
         if let Err(error) = grab(callback) {
             println!("ERROR: {error:?}");

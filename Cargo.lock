@@ -421,7 +421,7 @@ checksum = "6099cdc01846bc367c4e7dd630dc5966dccf36b652fae7a74e17b640411a91b2"
 [[package]]
 name = "blade-graphics"
 version = "0.6.0"
-source = "git+https://github.com/kvark/blade?rev=416375211bb0b5826b3584dccdb6a43369e499ad#416375211bb0b5826b3584dccdb6a43369e499ad"
+source = "git+https://github.com/kvark/blade?rev=e0ec4e720957edd51b945b64dd85605ea54bcfe5#e0ec4e720957edd51b945b64dd85605ea54bcfe5"
 dependencies = [
  "ash",
  "ash-window",
@@ -454,7 +454,7 @@ dependencies = [
 [[package]]
 name = "blade-macros"
 version = "0.3.0"
-source = "git+https://github.com/kvark/blade?rev=416375211bb0b5826b3584dccdb6a43369e499ad#416375211bb0b5826b3584dccdb6a43369e499ad"
+source = "git+https://github.com/kvark/blade?rev=e0ec4e720957edd51b945b64dd85605ea54bcfe5#e0ec4e720957edd51b945b64dd85605ea54bcfe5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -464,7 +464,7 @@ dependencies = [
 [[package]]
 name = "blade-util"
 version = "0.2.0"
-source = "git+https://github.com/kvark/blade?rev=416375211bb0b5826b3584dccdb6a43369e499ad#416375211bb0b5826b3584dccdb6a43369e499ad"
+source = "git+https://github.com/kvark/blade?rev=e0ec4e720957edd51b945b64dd85605ea54bcfe5#e0ec4e720957edd51b945b64dd85605ea54bcfe5"
 dependencies = [
  "blade-graphics",
  "bytemuck",
@@ -802,7 +802,6 @@ dependencies = [
 [[package]]
 name = "collections"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "indexmap",
  "rustc-hash 2.1.1",
@@ -948,6 +947,19 @@ dependencies = [
  "bitflags 2.9.1",
  "core-foundation 0.10.1",
  "core-graphics-types 0.2.0",
+ "foreign-types 0.5.0",
+ "libc",
+]
+
+[[package]]
+name = "core-graphics-helmer-fork"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32eb7c354ae9f6d437a6039099ce7ecd049337a8109b23d73e48e8ffba8e9cd5"
+dependencies = [
+ "bitflags 2.9.1",
+ "core-foundation 0.9.4",
+ "core-graphics-types 0.1.3",
  "foreign-types 0.5.0",
  "libc",
 ]
@@ -1158,7 +1170,6 @@ dependencies = [
 [[package]]
 name = "derive_refineable"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1217,6 +1228,12 @@ dependencies = [
  "redox_users",
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "dispatch"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 
 [[package]]
 name = "dispatch2"
@@ -1948,7 +1965,6 @@ dependencies = [
 [[package]]
 name = "gpui"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "anyhow",
  "as-raw-xcb-connection",
@@ -2004,6 +2020,7 @@ dependencies = [
  "raw-window-handle",
  "refineable",
  "resvg",
+ "scap",
  "schemars",
  "seahash",
  "semantic_version",
@@ -2026,8 +2043,8 @@ dependencies = [
  "wayland-cursor",
  "wayland-protocols",
  "wayland-protocols-plasma",
- "windows",
- "windows-core",
+ "windows 0.61.3",
+ "windows-core 0.61.2",
  "windows-numerics",
  "windows-registry",
  "workspace-hack",
@@ -2040,7 +2057,6 @@ dependencies = [
 [[package]]
 name = "gpui_macros"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -2051,9 +2067,9 @@ dependencies = [
 
 [[package]]
 name = "grid"
-version = "0.13.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d196ffc1627db18a531359249b2bf8416178d84b729f3cebeb278f285fb9b58c"
+checksum = "71b01d27060ad58be4663b9e4ac9e2d4806918e8876af8912afbddd1a91d5eaa"
 
 [[package]]
 name = "half"
@@ -2152,15 +2168,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-body"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1efedce1fb8e6913f23e0c92de8e62cd5b772a67e7b3946df930a62566c93184"
+dependencies = [
+ "bytes",
+ "http",
+]
+
+[[package]]
 name = "http_client"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "anyhow",
  "bytes",
  "derive_more",
  "futures",
  "http",
+ "http-body",
  "log",
  "serde",
  "serde_json",
@@ -2709,7 +2735,6 @@ dependencies = [
 [[package]]
 name = "media"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "anyhow",
  "bindgen",
@@ -2865,6 +2890,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
+name = "ntapi"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8a3895c6391c39d7fe7ebc444a87eb2991b2a0bc718fdabd071eec617fc68e4"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "num"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2984,6 +3018,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "915b1b472bc21c53464d6c8461c9d3af805ba1ef837e1cac254428f4a77177b1"
 dependencies = [
  "malloc_buf",
+ "objc_exception",
+]
+
+[[package]]
+name = "objc-foundation"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1add1b659e36c9607c7aab864a76c7a4c2760cd0cd2e120f3fb8b952c7e22bf9"
+dependencies = [
+ "block",
+ "objc",
+ "objc_id",
 ]
 
 [[package]]
@@ -3072,6 +3118,24 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-foundation",
  "objc2-quartz-core",
+]
+
+[[package]]
+name = "objc_exception"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad970fb455818ad6cba4c122ad012fae53ae8b4795f86378bce65e4f6bab2ca4"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "objc_id"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c92d4ddb4bd7b50d730c215ff871754d0da6b2178849f8a2a2ab69712d0c073b"
+dependencies = [
+ "objc",
 ]
 
 [[package]]
@@ -3406,6 +3470,15 @@ checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
 name = "quick-xml"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "quick-xml"
 version = "0.37.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "331e97a1af0bf59823e6eadffe373d7b27f485be8748f71471c662c1f269b7fb"
@@ -3653,7 +3726,6 @@ dependencies = [
 [[package]]
 name = "refineable"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "derive_refineable",
  "workspace-hack",
@@ -3856,6 +3928,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "scap"
+version = "0.0.8"
+source = "git+https://github.com/zed-industries/scap?rev=808aa5c45b41e8f44729d02e38fd00a2fe2722e7#808aa5c45b41e8f44729d02e38fd00a2fe2722e7"
+dependencies = [
+ "anyhow",
+ "cocoa 0.25.0",
+ "core-graphics-helmer-fork",
+ "log",
+ "objc",
+ "rand 0.8.5",
+ "screencapturekit",
+ "screencapturekit-sys",
+ "sysinfo",
+ "tao-core-video-sys",
+ "windows 0.61.3",
+ "windows-capture",
+ "x11",
+ "xcb",
+]
+
+[[package]]
 name = "schemars"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3894,6 +3987,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
+name = "screencapturekit"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a5eeeb57ac94960cfe5ff4c402be6585ae4c8d29a2cf41b276048c2e849d64e"
+dependencies = [
+ "screencapturekit-sys",
+]
+
+[[package]]
+name = "screencapturekit-sys"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22411b57f7d49e7fe08025198813ee6fd65e1ee5eff4ebc7880c12c82bde4c60"
+dependencies = [
+ "block",
+ "dispatch",
+ "objc",
+ "objc-foundation",
+ "objc_id",
+ "once_cell",
+]
+
+[[package]]
 name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3908,7 +4024,6 @@ checksum = "0f7d95a54511e0c7be3f51e8867aa8cf35148d7b9445d44de2f943e2b206e749"
 [[package]]
 name = "semantic_version"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "anyhow",
  "serde",
@@ -4224,7 +4339,6 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sum_tree"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "arrayvec",
  "log",
@@ -4380,6 +4494,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sysinfo"
+version = "0.31.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "355dbe4f8799b304b05e1b0f05fc59b2a18d36645cf169607da45bde2f69a1be"
+dependencies = [
+ "core-foundation-sys 0.8.7",
+ "libc",
+ "memchr",
+ "ntapi",
+ "rayon",
+ "windows 0.57.0",
+]
+
+[[package]]
 name = "system-deps"
 version = "6.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4394,13 +4522,12 @@ dependencies = [
 
 [[package]]
 name = "taffy"
-version = "0.4.4"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ec17858c2d465b2f734b798b920818a974faf0babb15d7fef81818a4b2d16f1"
+checksum = "7aaef0ac998e6527d6d0d5582f7e43953bb17221ac75bb8eb2fcc2db3396db1c"
 dependencies = [
  "arrayvec",
  "grid",
- "num-traits",
  "serde",
  "slotmap",
 ]
@@ -4410,6 +4537,18 @@ name = "take-until"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bdb6fa0dfa67b38c1e66b7041ba9dcf23b99d8121907cd31c807a332f7a0bbb"
+
+[[package]]
+name = "tao-core-video-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "271450eb289cb4d8d0720c6ce70c72c8c858c93dd61fc625881616752e6b98f6"
+dependencies = [
+ "cfg-if",
+ "core-foundation-sys 0.8.7",
+ "libc",
+ "objc",
+]
 
 [[package]]
 name = "target-lexicon"
@@ -4854,7 +4993,6 @@ checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
 [[package]]
 name = "util"
 version = "0.1.0"
-source = "git+https://github.com/zed-industries/zed#76e52ea37447d6af39b2dd6f91a2bf1ed57e7494"
 dependencies = [
  "anyhow",
  "async-fs",
@@ -5149,7 +5287,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "896fdafd5d28145fce7958917d69f2fd44469b1d4e861cb5961bcbeebc6d1484"
 dependencies = [
  "proc-macro2",
- "quick-xml",
+ "quick-xml 0.37.5",
  "quote",
 ]
 
@@ -5214,15 +5352,38 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12342cb4d8e3b046f3d80effd474a7a02447231330ef77d71daa6fbc40681143"
+dependencies = [
+ "windows-core 0.57.0",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows"
 version = "0.61.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9babd3a767a4c1aef6900409f85f5d53ce2544ccdfaa86dad48c91782c6d6893"
 dependencies = [
  "windows-collections",
- "windows-core",
+ "windows-core 0.61.2",
  "windows-future",
  "windows-link",
  "windows-numerics",
+]
+
+[[package]]
+name = "windows-capture"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a4df73e95feddb9ec1a7e9c2ca6323b8c97d5eeeff78d28f1eccdf19c882b24"
+dependencies = [
+ "parking_lot",
+ "rayon",
+ "thiserror 2.0.12",
+ "windows 0.61.3",
+ "windows-future",
 ]
 
 [[package]]
@@ -5231,7 +5392,19 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3beeceb5e5cfd9eb1d76b381630e82c4241ccd0d27f1a39ed41b2760b255c5e8"
 dependencies = [
- "windows-core",
+ "windows-core 0.61.2",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2ed2439a290666cd67ecce2b0ffaad89c2a56b976b736e6ece670297897832d"
+dependencies = [
+ "windows-implement 0.57.0",
+ "windows-interface 0.57.0",
+ "windows-result 0.1.2",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5240,10 +5413,10 @@ version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0fdd3ddb90610c7638aa2b3a3ab2904fb9e5cdbecc643ddb3647212781c4ae3"
 dependencies = [
- "windows-implement",
- "windows-interface",
+ "windows-implement 0.60.0",
+ "windows-interface 0.59.1",
  "windows-link",
- "windows-result",
+ "windows-result 0.3.4",
  "windows-strings",
 ]
 
@@ -5253,9 +5426,20 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc6a41e98427b19fe4b73c550f060b59fa592d7d686537eebf9385621bfbad8e"
 dependencies = [
- "windows-core",
+ "windows-core 0.61.2",
  "windows-link",
  "windows-threading",
+]
+
+[[package]]
+name = "windows-implement"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9107ddc059d5b6fbfbffdfa7a7fe3e22a226def0b2608f72e9d552763d3e1ad7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -5263,6 +5447,17 @@ name = "windows-implement"
 version = "0.60.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a47fddd13af08290e67f4acabf4b459f647552718f683a7b415d290ac744a836"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "windows-interface"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29bee4b38ea3cde66011baa44dba677c432a78593e202392d1e9070cf2a7fca7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5292,7 +5487,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9150af68066c4c5c07ddc0ce30421554771e528bde427614c61038bc2c92c2b1"
 dependencies = [
- "windows-core",
+ "windows-core 0.61.2",
  "windows-link",
 ]
 
@@ -5303,8 +5498,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b8a9ed28765efc97bbc954883f4e6796c33a06546ebafacbabee9696967499e"
 dependencies = [
  "windows-link",
- "windows-result",
+ "windows-result 0.3.4",
  "windows-strings",
+]
+
+[[package]]
+name = "windows-result"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e383302e8ec8515204254685643de10811af0ed97ea37210dc26fb0032647f8"
+dependencies = [
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5633,6 +5837,18 @@ name = "x11rb-protocol"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec107c4503ea0b4a98ef47356329af139c0a4f7750e621cf2973cd3385ebcb3d"
+
+[[package]]
+name = "xcb"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1e2f212bb1a92cd8caac8051b829a6582ede155ccb60b5d5908b81b100952be"
+dependencies = [
+ "bitflags 1.3.2",
+ "libc",
+ "quick-xml 0.30.0",
+ "x11",
+]
 
 [[package]]
 name = "xcursor"
