@@ -1,44 +1,82 @@
 # Vimouse - Vim-like Mouse Control
 
-A Rust application that provides vim-like mouse control with keyboard shortcuts, including the ability to find and list all clickable elements on the screen.
+A Rust application that provides vim-like mouse control with keyboard shortcuts, including **real clickable elements detection** using macOS Accessibility APIs.
 
 ## Features
 
 - **Vim-like mouse movement**: Use hjkl keys for directional movement
 - **Quick screen navigation**: Jump to screen quadrants using qwer/asdf/zxcv keys
 - **Smooth scrolling**: Use g+hjkl for smooth momentum-based scrolling
-- **Clickable elements detection**: Press 'i' to find all clickable elements on screen
+- **🆕 Real clickable elements detection**: Press 'i' to find actual UI elements on screen
 - **Multiple click modes**: Space for left click, Ctrl/CapsLock for right click
 - **Variable speed**: Shift for slow movement, Alt for ultra-fast movement
-- **Cross-platform**: Works on macOS, Linux, and Windows
+- **Cross-platform**: Works on macOS with full features, other platforms with core functionality
 
-## New Feature: Clickable Elements Detection
+## 🔍 Real Clickable Elements Detection
 
-Press the **'i' key** while the application is running to scan the screen and print all clickable elements to the console. This feature:
+Press the **'i' key** while the application is running to perform a comprehensive scan of all interactive UI elements on your screen.
 
-- **On macOS**: Uses Core Graphics APIs to enumerate actual windows
-- **On other platforms**: Shows sample data for demonstration purposes
-- Excludes the vimouse application window itself
-- Displays window names, applications, locations, and sizes
+### What It Actually Detects
+
+**Real UI Elements (macOS only):**
+- 🔘 **Buttons** - All types (standard, menu, popup buttons)
+- 📝 **Text Fields** - Input fields, text areas, search fields
+- ☑️ **Checkboxes** - Interactive checkbox controls
+- 🔵 **Radio Buttons** - Radio button selections
+- 🔗 **Links** - Clickable hyperlinks
+- 📋 **Menus** - Menu items and dropdown options
+- 📂 **Tabs** - Tab controls and tab groups
+- 🎚️ **Sliders** - Interactive slider controls
+- 🖼️ **Images** - Clickable image elements
+- 📊 **Tables/Lists** - Interactive table and list elements
+
+### Technical Implementation
+
+**macOS (Full Implementation):**
+- Uses **macOS Accessibility APIs** (`AXUIElement`)
+- Traverses the complete UI hierarchy of all applications
+- Filters for genuinely clickable/interactive elements
+- Extracts real properties: position, size, title, value, enabled state
+- Excludes invisible, disabled, or non-interactive elements
+
+**Other Platforms:**
+- Displays appropriate "not supported" message
+- No fake data - honest about platform limitations
 
 ### Example Output
 
 ```
 🔍 Searching for clickable elements on screen...
-Found 2 clickable elements:
---------------------------------------------------------------------------------
-1. Window
-   Text: "Sample Window 1"
-   Location: (100, 100)
-   Size: 800x600
+Found 23 clickable elements in 45.2ms:
+------------------------------------------------------------------------------------------
+📊 Element types found:
+   • AXButton: 8 elements
+   • AXTextField: 3 elements  
+   • AXCheckBox: 2 elements
+   • AXLink: 4 elements
+   • AXMenuItem: 6 elements
 
-2. Window
-   Text: "Sample Window 2"
-   Location: (200, 200)
-   Size: 600x400
+1. 🔘 AXButton
+   Text: "Save Document"
+   Location: (150, 200)
+   Size: 80×24
+   Click area: 1920 sq pixels
 
---------------------------------------------------------------------------------
-Total: 2 clickable elements
+2. 📝 AXTextField
+   Text: "Enter your name"
+   Location: (200, 300)
+   Size: 200×22
+   Click area: 4400 sq pixels
+
+3. ☑️ AXCheckBox
+   Text: "Enable notifications"
+   Location: (50, 450)
+   Size: 16×16
+   Click area: 256 sq pixels
+
+------------------------------------------------------------------------------------------
+✅ Total: 23 clickable elements | Scan time: 45.2ms
+💡 Tip: Use mouse coordinates to click on these elements programmatically
 ```
 
 ## Key Bindings
@@ -63,38 +101,40 @@ Total: 2 clickable elements
 - `Alt` - Ultra-fast movement mode
 
 ### Special Features
-- `i` - **Find and list all clickable elements on screen**
+- `i` - **🔍 Find and list all real clickable elements on screen**
 - `Esc` - Exit application
 
-## Installation
+## Installation & Usage
 
-### Prerequisites
+### Prerequisites (macOS)
 
-Make sure you have Rust installed:
+1. **Rust Installation:**
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+2. **Accessibility Permissions:**
+   - The app will prompt you to grant accessibility permissions
+   - This is **required** for both mouse control and UI element detection
+
+### Build & Run
+
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-### Build
-
-```bash
+# Build
 cargo build --release
-```
 
-### Run
-
-```bash
+# Run
 ./target/release/vimouse
 ```
 
-The application will display helpful information in the console:
+### Example Console Output
 
 ```
 🐭 Vimouse - Vim-like Mouse Control (macOS)
 Press 'i' to find clickable elements on screen
 Press 'Esc' to exit
 Use hjkl for movement, space for click, g+hjkl for scroll
-Screen size: 2560x1440
+Screen size: 2560×1440
 
 🔑 Key Bindings:
    Movement: h/j/k/l (left/down/up/right)
@@ -110,59 +150,60 @@ Starting mouse control...
 
 ## Platform Support
 
-- **macOS**: Full support with Core Graphics APIs for real window detection
-- **Linux/Windows**: Core mouse control features with sample clickable elements data
+- **macOS**: ✅ Full support with real UI element detection via Accessibility APIs
+- **Linux/Windows**: ⚠️ Core mouse control only (no clickable elements detection)
 
-## Technical Details
-
-### Architecture
-- **Cross-platform compatibility**: Uses conditional compilation for platform-specific features
-- **No unstable Rust features**: Compatible with stable Rust compiler
-- **Simple dependencies**: Minimal dependency footprint for reliability
-- **Console-based interface**: No GUI framework dependencies
+## Technical Architecture
 
 ### macOS Implementation
-- Core Graphics `CGWindowListCopyWindowInfo` for window enumeration
-- Core Foundation data types for safe memory management
-- Platform-specific mouse position detection
-- Native accessibility integration
+- **Accessibility APIs**: Direct integration with `AXUIElement` APIs
+- **System-wide scanning**: Enumerates all applications and their UI hierarchies
+- **Smart filtering**: Only returns genuinely interactive elements
+- **Property extraction**: Real position, size, text, and state information
+- **Performance optimized**: Efficient recursive traversal with depth limiting
 
-### Error Handling
-- Graceful degradation when permissions are not available
-- Clear error messages with troubleshooting steps
-- Platform-appropriate guidance for users
+### Safety & Reliability
+- **Memory management**: Proper CFRelease for all Core Foundation objects
+- **Error handling**: Graceful degradation when permissions are denied
+- **Recursion protection**: Prevents infinite loops in complex UI hierarchies
+- **Type safety**: Strong typing for all Accessibility API interactions
 
-## Permissions
+### Element Classification
+The system identifies elements by their actual accessibility roles:
+- Validates element is enabled and visible
+- Extracts meaningful text (title, value, or role-based description)
+- Calculates accurate screen coordinates and dimensions
+- Filters out decorative or non-interactive elements
 
-### macOS
-On macOS, this application requires:
-- **Accessibility Access**: For mouse control and input monitoring
+## Permissions & Troubleshooting
+
+### Required Permissions (macOS)
+- **Accessibility Access**: For UI element detection and mouse control
 - **Input Monitoring**: For global key capture
 
-### Troubleshooting Permissions (macOS)
+### Setup Instructions
+1. Run the application
+2. When prompted, go to **System Preferences** → **Security & Privacy** → **Privacy**
+3. Select **Accessibility** from the left panel
+4. Click the lock icon and authenticate
+5. Click **+** and add the vimouse executable
+6. Ensure the checkbox is enabled
+7. Restart the application
 
-If you get a permissions error:
+### Troubleshooting
+If element detection returns no results:
+- ✓ Verify accessibility permissions are granted
+- ✓ Ensure applications with UI elements are open and visible
+- ✓ Check that elements are not hidden behind other windows
+- ✓ Try running with different applications in focus
 
-1. Go to **System Preferences** > **Security & Privacy** > **Privacy**
-2. Select **Accessibility** from the left panel
-3. Click the lock icon and enter your password
-4. Click the **+** button and add the vimouse executable
-5. Make sure the checkbox next to vimouse is enabled
-6. Restart the application
+## Use Cases
 
-### Other Platforms
-Other platforms may require appropriate permissions for:
-- Global key capture
-- Mouse simulation
-- Input monitoring
-
-## Development Notes
-
-This implementation was designed to:
-- Avoid unstable Rust features and complex dependency chains
-- Provide a working foundation that can be enhanced per platform
-- Maintain the original vimouse functionality while adding new features
-- Be easily buildable and deployable across different environments
+- **Accessibility Testing**: Identify all interactive elements for testing
+- **UI Automation**: Get precise coordinates for automated clicking
+- **Development Debugging**: Understand UI element hierarchy and properties
+- **Screen Reading**: Programmatically access UI element information
+- **Quality Assurance**: Verify all expected interactive elements are present
 
 ## License
 

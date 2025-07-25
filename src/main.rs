@@ -45,38 +45,285 @@ mod clickable_detector {
         array::CFArray,
         base::{CFTypeRef, TCFType},
         dictionary::CFDictionary,
+        string::CFString,
+        number::CFNumber,
     };
+    use accessibility_sys::*;
+    use std::ptr;
 
     pub fn find_clickable_elements() -> Vec<ClickableElement> {
         let mut elements = Vec::new();
         
         unsafe {
-            // Get all on-screen windows using Core Graphics
-            let window_list_info = CGWindowListCopyWindowInfo(
-                kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
-                kCGNullWindowID
-            );
-            
-            if window_list_info.is_null() {
+            // First get the system-wide accessibility element
+            let system_wide = AXUIElementCreateSystemWide();
+            if system_wide.is_null() {
+                println!("Failed to create system-wide accessibility element");
                 return elements;
             }
             
-            let window_array: CFArray<CFDictionary> = CFArray::wrap_under_create_rule(window_list_info);
+            // Get all applications
+            let mut apps_ref: CFTypeRef = ptr::null();
+            let result = AXUIElementCopyAttributeValue(
+                system_wide, 
+                kAXApplicationsAttribute, 
+                &mut apps_ref
+            );
             
-            // For simplicity, just report the count and basic info
-            for i in 0..window_array.len() {
-                elements.push(ClickableElement {
-                    text: format!("Window {}", i + 1),
-                    x: 100.0 + (i as f64 * 50.0), // Sample positions
-                    y: 100.0 + (i as f64 * 50.0),
-                    width: 200.0,
-                    height: 150.0,
-                    role: "Window".to_string(),
-                });
+            if result != kAXErrorSuccess || apps_ref.is_null() {
+                println!("Failed to get applications list. Error code: {}", result);
+                CFRelease(system_wide as CFTypeRef);
+                return elements;
             }
+            
+            let apps_array: CFArray<AXUIElementRef> = CFArray::wrap_under_create_rule(apps_ref as _);
+            
+            // Iterate through each application
+            for i in 0..apps_array.len() {
+                if let Some(app_ref) = apps_array.get(i) {
+                    let app_element = *app_ref;
+                    
+                    // Skip our own application
+                    if let Some(app_name) = get_app_name(app_element) {
+                        if app_name.to_lowercase().contains("vimouse") {
+                            continue;
+                        }
+                    }
+                    
+                    // Get windows for this application
+                    collect_app_elements(app_element, &mut elements);
+                }
+            }
+            
+            CFRelease(system_wide as CFTypeRef);
         }
         
         elements
+    }
+
+    unsafe fn collect_app_elements(app_element: AXUIElementRef, elements: &mut Vec<ClickableElement>) {
+        // Get windows for this application
+        let mut windows_ref: CFTypeRef = ptr::null();
+        let result = AXUIElementCopyAttributeValue(
+            app_element,
+            kAXWindowsAttribute,
+            &mut windows_ref
+        );
+        
+        if result != kAXErrorSuccess || windows_ref.is_null() {
+            return;
+        }
+        
+        let windows_array: CFArray<AXUIElementRef> = CFArray::wrap_under_create_rule(windows_ref as _);
+        
+        // Iterate through each window
+        for i in 0..windows_array.len() {
+            if let Some(window_ref) = windows_array.get(i) {
+                let window_element = *window_ref;
+                collect_window_elements(window_element, elements, 0);
+            }
+        }
+    }
+
+    unsafe fn collect_window_elements(element: AXUIElementRef, elements: &mut Vec<ClickableElement>, depth: i32) {
+        // Prevent infinite recursion
+        if depth > 10 {
+            return;
+        }
+        
+        // Check if this element is clickable
+        if is_clickable_element(element) {
+            if let Some(clickable_elem) = create_clickable_element(element) {
+                elements.push(clickable_elem);
+            }
+        }
+        
+        // Get children and recurse
+        let mut children_ref: CFTypeRef = ptr::null();
+        let result = AXUIElementCopyAttributeValue(
+            element,
+            kAXChildrenAttribute,
+            &mut children_ref
+        );
+        
+        if result == kAXErrorSuccess && !children_ref.is_null() {
+            let children_array: CFArray<AXUIElementRef> = CFArray::wrap_under_create_rule(children_ref as _);
+            
+            for i in 0..children_array.len() {
+                if let Some(child_ref) = children_array.get(i) {
+                    let child_element = *child_ref;
+                    collect_window_elements(child_element, elements, depth + 1);
+                }
+            }
+        }
+    }
+
+    unsafe fn is_clickable_element(element: AXUIElementRef) -> bool {
+        // Get the role of the element
+        if let Some(role) = get_element_role(element) {
+            match role.as_str() {
+                "AXButton" | "AXMenuButton" | "AXPopUpButton" | "AXCheckBox" | 
+                "AXRadioButton" | "AXTextField" | "AXTextArea" | "AXSearchField" |
+                "AXLink" | "AXMenuItem" | "AXTab" | "AXSlider" | "AXIncrementor" |
+                "AXDecrementor" | "AXComboBox" | "AXDisclosureTriangle" |
+                "AXStepper" | "AXSegmentedControl" | "AXTabGroup" | "AXScrollBar" |
+                "AXTable" | "AXOutline" | "AXList" | "AXImage" => {
+                    // Additional check: element should be enabled and visible
+                    is_element_enabled(element) && is_element_visible(element)
+                },
+                _ => false
+            }
+        } else {
+            false
+        }
+    }
+
+    unsafe fn create_clickable_element(element: AXUIElementRef) -> Option<ClickableElement> {
+        let role = get_element_role(element).unwrap_or("Unknown".to_string());
+        let title = get_element_title(element).unwrap_or("".to_string());
+        let value = get_element_value(element).unwrap_or("".to_string());
+        let position = get_element_position(element).unwrap_or((0.0, 0.0));
+        let size = get_element_size(element).unwrap_or((0.0, 0.0));
+        
+        // Create descriptive text
+        let text = if !title.is_empty() {
+            title
+        } else if !value.is_empty() {
+            value
+        } else {
+            format!("{} Element", role)
+        };
+        
+        Some(ClickableElement {
+            text,
+            x: position.0,
+            y: position.1,
+            width: size.0,
+            height: size.1,
+            role,
+        })
+    }
+
+    unsafe fn get_app_name(app_element: AXUIElementRef) -> Option<String> {
+        get_element_attribute_string(app_element, kAXTitleAttribute)
+    }
+
+    unsafe fn get_element_role(element: AXUIElementRef) -> Option<String> {
+        get_element_attribute_string(element, kAXRoleAttribute)
+    }
+
+    unsafe fn get_element_title(element: AXUIElementRef) -> Option<String> {
+        get_element_attribute_string(element, kAXTitleAttribute)
+    }
+
+    unsafe fn get_element_value(element: AXUIElementRef) -> Option<String> {
+        get_element_attribute_string(element, kAXValueAttribute)
+    }
+
+    unsafe fn is_element_enabled(element: AXUIElementRef) -> bool {
+        let mut enabled_ref: CFTypeRef = ptr::null();
+        let result = AXUIElementCopyAttributeValue(
+            element,
+            kAXEnabledAttribute,
+            &mut enabled_ref
+        );
+        
+        if result == kAXErrorSuccess && !enabled_ref.is_null() {
+            let enabled_num = enabled_ref as *const CFNumber;
+            if let Some(enabled_cf) = CFNumber::wrap_under_get_rule(enabled_num) {
+                enabled_cf.to_i32().unwrap_or(0) != 0
+            } else {
+                true // Default to enabled if we can't determine
+            }
+        } else {
+            true // Default to enabled
+        }
+    }
+
+    unsafe fn is_element_visible(element: AXUIElementRef) -> bool {
+        // Check if element has a position (visible elements should have position)
+        get_element_position(element).is_some()
+    }
+
+    unsafe fn get_element_position(element: AXUIElementRef) -> Option<(f64, f64)> {
+        let mut position_ref: CFTypeRef = ptr::null();
+        let result = AXUIElementCopyAttributeValue(
+            element,
+            kAXPositionAttribute,
+            &mut position_ref
+        );
+        
+        if result == kAXErrorSuccess && !position_ref.is_null() {
+            let mut point = CGPoint { x: 0.0, y: 0.0 };
+            let success = AXValueGetValue(
+                position_ref as AXValueRef,
+                kAXValueCGPointType,
+                &mut point as *mut _ as *mut _
+            );
+            
+            CFRelease(position_ref);
+            
+            if success {
+                Some((point.x, point.y))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    unsafe fn get_element_size(element: AXUIElementRef) -> Option<(f64, f64)> {
+        let mut size_ref: CFTypeRef = ptr::null();
+        let result = AXUIElementCopyAttributeValue(
+            element,
+            kAXSizeAttribute,
+            &mut size_ref
+        );
+        
+        if result == kAXErrorSuccess && !size_ref.is_null() {
+            let mut size = CGSize { width: 0.0, height: 0.0 };
+            let success = AXValueGetValue(
+                size_ref as AXValueRef,
+                kAXValueCGSizeType,
+                &mut size as *mut _ as *mut _
+            );
+            
+            CFRelease(size_ref);
+            
+            if success {
+                Some((size.width, size.height))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    unsafe fn get_element_attribute_string(element: AXUIElementRef, attribute: CFStringRef) -> Option<String> {
+        let mut attr_ref: CFTypeRef = ptr::null();
+        let result = AXUIElementCopyAttributeValue(element, attribute, &mut attr_ref);
+        
+        if result == kAXErrorSuccess && !attr_ref.is_null() {
+            let cf_string = CFString::wrap_under_create_rule(attr_ref as _);
+            Some(cf_string.to_string())
+        } else {
+            None
+        }
+    }
+
+    // Define CGPoint and CGSize for AXValue conversion
+    #[repr(C)]
+    struct CGPoint {
+        x: f64,
+        y: f64,
+    }
+
+    #[repr(C)]
+    struct CGSize {
+        width: f64,
+        height: f64,
     }
 }
 
@@ -85,54 +332,88 @@ mod clickable_detector {
     use super::*;
     
     pub fn find_clickable_elements() -> Vec<ClickableElement> {
-        println!("Clickable element detection is only supported on macOS currently");
-        
-        // Return some sample data for demonstration
-        vec![
-            ClickableElement {
-                text: "Sample Window 1".to_string(),
-                x: 100.0,
-                y: 100.0,
-                width: 800.0,
-                height: 600.0,
-                role: "Window".to_string(),
-            },
-            ClickableElement {
-                text: "Sample Window 2".to_string(),
-                x: 200.0,
-                y: 200.0,
-                width: 600.0,
-                height: 400.0,
-                role: "Window".to_string(),
-            },
-        ]
+        println!("⚠️  Clickable element detection is only supported on macOS currently");
+        println!("    The accessibility APIs required for this feature are platform-specific.");
+        Vec::new()
     }
 }
 
 fn print_clickable_elements() {
     println!("🔍 Searching for clickable elements on screen...");
+    let start_time = std::time::Instant::now();
     let elements = clickable_detector::find_clickable_elements();
+    let duration = start_time.elapsed();
     
     if elements.is_empty() {
         println!("No clickable elements found.");
+        #[cfg(target_os = "macos")]
+        {
+            println!("💡 This might be because:");
+            println!("   • Accessibility permissions are not granted");
+            println!("   • No applications with UI elements are currently open");
+            println!("   • UI elements are not currently visible");
+        }
         return;
     }
     
-    println!("Found {} clickable elements:", elements.len());
-    println!("{:-<80}", "");
+    println!("Found {} clickable elements in {:.2}ms:", elements.len(), duration.as_millis());
+    println!("{:-<90}", "");
     
+    // Group elements by role for better organization
+    let mut role_counts = std::collections::HashMap::new();
+    for element in &elements {
+        *role_counts.entry(&element.role).or_insert(0) += 1;
+    }
+    
+    // Print summary
+    println!("📊 Element types found:");
+    for (role, count) in &role_counts {
+        println!("   • {}: {} elements", role, count);
+    }
+    println!();
+    
+    // Print detailed list
     for (i, element) in elements.iter().enumerate() {
-        println!("{}. {}", i + 1, element.role);
-        if !element.text.is_empty() {
+        println!("{}. {} {}", i + 1, 
+            match element.role.as_str() {
+                "AXButton" => "🔘",
+                "AXTextField" | "AXTextArea" | "AXSearchField" => "📝",
+                "AXCheckBox" => "☑️",
+                "AXRadioButton" => "🔵",
+                "AXLink" => "🔗",
+                "AXMenuItem" => "📋",
+                "AXTab" => "📂",
+                "AXSlider" => "🎚️",
+                "AXComboBox" | "AXPopUpButton" => "📋",
+                "AXImage" => "🖼️",
+                "AXTable" | "AXOutline" | "AXList" => "📊",
+                _ => "🔳"
+            },
+            element.role
+        );
+        
+        if !element.text.is_empty() && element.text != format!("{} Element", element.role) {
             println!("   Text: \"{}\"", element.text);
         }
+        
         println!("   Location: ({:.0}, {:.0})", element.x, element.y);
-        println!("   Size: {:.0}x{:.0}", element.width, element.height);
+        println!("   Size: {:.0}×{:.0}", element.width, element.height);
+        
+        // Add clickability info
+        if element.width > 0.0 && element.height > 0.0 {
+            println!("   Click area: {:.0} sq pixels", element.width * element.height);
+        }
+        
         println!();
     }
     
-    println!("{:-<80}", "");
-    println!("Total: {} clickable elements", elements.len());
+    println!("{:-<90}", "");
+    println!("✅ Total: {} clickable elements | Scan time: {:.2}ms", elements.len(), duration.as_millis());
+    
+    #[cfg(target_os = "macos")]
+    {
+        println!("💡 Tip: Use mouse coordinates to click on these elements programmatically");
+    }
 }
 
 lazy_static! {
